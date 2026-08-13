@@ -6,13 +6,13 @@
 [app]
 
 # (str) Title of your application
-title = My Application
+title = TRIPLE8SPIN
 
 # (str) Package name
-package.name = myapp
+package.name = triple8spin
 
 # (str) Package domain (needed for android/ios packaging)
-package.domain = org.test
+package.domain = org.triple8spin
 
 # (str) Source code where the main.py live
 source.dir = .
@@ -42,7 +42,7 @@ version = 0.1
 
 # (list) Application requirements
 # comma separated e.g. requirements = sqlite3,kivy
-requirements = python3,kivy
+requirements = python3,pygame
 
 # (str) Custom source folders for requirements
 # Sets custom source for any requirements with recipes
