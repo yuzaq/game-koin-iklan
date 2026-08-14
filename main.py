@@ -408,6 +408,38 @@ class Aplikasi(App):
         except Exception as e:
             print(f"Gagal Inisialisasi AdMob: {e}")
 
+    def kalkulasi_hasil_slot(self):
+        simbol = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9]
+        bobot  = [9.6, 9.6, 9.6, 9.6, 9.6, 9.6, 9.6, 9.6, 13.5, 9.3]
+
+        top_res = [randint(0, 9), randint(0, 9), randint(0, 9)]
+        mid_res = choices(simbol, weights=bobot, k=3)
+        bot_res = [randint(0, 9), randint(0, 9), randint(0, 9)]
+
+        self.set_slot_3x3(top_res, mid_res, bot_res)
+
+        d1, d2, d3 = mid_res[0], mid_res[1], mid_res[2]
+        digits = [d1, d2, d3]
+        count_8 = digits.count(8)
+
+        nilai_dasar_rp = self.taruhan // 10
+        hentikan_putar()
+
+        if count_8 >= 1:
+            mainkan_benar()
+
+            if count_8 == 3:
+                hadiah_rp = nilai_dasar_rp * 5
+            elif count_8 == 2:
+                hadiah_rp = nilai_dasar_rp * 2
+            else:
+                hadiah_rp = nilai_dasar_rp * 1
+
+            pemain["penghasilan"] += hadiah_rp
+            pemain["jumlah_menang"] += 1
+
+            uang_str = format_uang(hadiah_rp, BAHASA)
+
             if count_8 == 3:
                 pesan = TEKS[BAHASA]["jackpot_3"].format(uang_str)
             elif count_8 == 2:
