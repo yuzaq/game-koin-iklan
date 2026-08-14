@@ -27,6 +27,8 @@ jobs:
           pip install --upgrade buildozer cython==0.29.36
 
       - name: Build APK dengan Buildozer
+        env:
+          PIP_CONSTRAINT: ${{ github.workspace }}/constraints-pip.txt
         run: |
           yes | buildozer android debug
 
