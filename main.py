@@ -378,7 +378,7 @@ class Input(TextInput):
         self.background_color = (0.08, 0.11, 0.18, 1)
         self.multiline = False
         self.padding = [10, 8, 10, 8]
-        
+
 class RewardsHandler(RewardedListenerInterface):
     def __init__(self, app_ref):
         self.app_ref = app_ref
@@ -408,6 +408,531 @@ class Aplikasi(App):
         except Exception as e:
             print(f"Gagal Inisialisasi AdMob: {e}")
 
+    def build(self):
+        Clock.schedule_once(lambda d: muat_suara(), 0.5)
+        self.ticker = None
+        self.metode_terpilih = "OVO"
+        self.nominal_terpilih = 100
+        self.sisa_auto = 0
+        self.bonus_kotak_terakhir = 0
+
+        l = BoxLayout(orientation="vertical", padding=10, spacing=6)
+
+        # 1. LOGO ATAS
+        file_judul = "logo_judul.png" if os.path.exists("logo_judul.png") else None
+        if file_judul:
+            self.judul = Image(
+                source=file_judul,
+                size_hint_y=None,
+                height='60dp',
+                allow_stretch=True,
+                keep_ratio=True,
+            )
+            l.add_widget(self.judul)
+        else:
+            self.lbl_head = Label(
+                text="[b][color=34d399]TRIPLE[/color][color=fbbf24]8[/color] [color=ffffff]SPIN[/color][/b]",
+                markup=True,
+                font_size="22sp",
+                size_hint_y=None,
+                height='45dp'
+            )
+            l.add_widget(self.lbl_head)
+
+        # 2. AREA KHUSUS IKLAN BANNER (FIXED HEIGHT 50DP)
+        self.banner_ad_container = BoxLayout(
+            size_hint_y=None,
+            height='50dp',
+            padding=[4, 2, 4, 2]
+        )
+        
+        with self.banner_ad_container.canvas.before:
+            Color(0.1, 0.13, 0.18, 1)
+            self.rect_ad = RoundedRectangle(pos=self.banner_ad_container.pos, size=self.banner_ad_container.size, radius=[8])
+            Color(0.3, 0.35, 0.45, 1)
+            self.line_ad = Line(rounded_rectangle=(self.banner_ad_container.x, self.banner_ad_container.y, self.banner_ad_container.width, self.banner_ad_container.height, 8), width=1)
+        
+        self.banner_ad_container.bind(
+            pos=lambda inst, val: setattr(self.rect_ad, 'pos', val) or setattr(self.line_ad, 'rounded_rectangle', (val[0], val[1], inst.width, inst.height, 8)),
+            size=lambda inst, val: setattr(self.rect_ad, 'size', val) or setattr(self.line_ad, 'rounded_rectangle', (inst.x, inst.y, val[0], val[1], 8))
+        )
+
+        lbl_placeholder = Label(
+            text="[color=556677][ AREA IKLAN BANNER ][/color]",
+            markup=True,
+            font_size="11sp",
+            halign="center"
+        )
+        self.banner_ad_container.add_widget(lbl_placeholder)
+        l.add_widget(self.banner_ad_container)
+
+        # 3. SALDO & STATUS
+        self.saldo_lbl = Label(
+            text="",
+            markup=True,
+            font_size="12sp",
+            size_hint_y=None,
+            height='40dp',
+            halign="center",
+        )
+        l.add_widget(self.saldo_lbl)
+
+        # 4. KOTAK KONTEN UTAMA
+        self.utama = CardBox(
+            orientation="vertical", padding=8, spacing=4, size_hint_y=1.0
+        )
+        self.info = Label(
+            text="",
+            markup=True,
+            font_size="10sp",
+            size_hint_y=0.12,
+            halign="center",
+            valign="middle",
+        )
+        self.info.bind(size=self.info.setter("text_size"))
+        self.utama.add_widget(self.info)
+
+        self.berita = Label(
+            text="", markup=True, font_size="11sp", size_hint_y=0.06, halign="center"
+        )
+        self.utama.add_widget(self.berita)
+
+        # Dashboard Promo
+        self.banner_promo = CardBox(
+            orientation="vertical",
+            padding=8,
+            spacing=4,
+            size_hint_y=0.42
+        )
+        self.banner_promo.bg_color.rgba = (0.06, 0.09, 0.14, 1)
+
+        self.lbl_jackpot_title = Label(
+            text="[b][color=fbbf24]= GRAND JACKPOT =[/color][/b]",
+            markup=True,
+            font_size="15sp",
+            halign="center",
+            size_hint_y=0.25
+        )
+        
+        self.lbl_jackpot_num = Label(
+            text="[b][color=34d399]>[/color] [color=fbbf24]8  8  8[/color] [color=34d399]<[/color][/b]",
+            markup=True,
+            font_size="32sp",
+            halign="center",
+            size_hint_y=0.50
+        )
+        
+        self.lbl_jackpot_sub = Label(
+            text=TEKS[BAHASA]["promo_win"],
+            markup=True,
+            font_size="11sp",
+            halign="center",
+            size_hint_y=0.25
+        )
+
+        self.banner_promo.add_widget(self.lbl_jackpot_title)
+        self.banner_promo.add_widget(self.lbl_jackpot_num)
+        self.banner_promo.add_widget(self.lbl_jackpot_sub)
+
+        # Slot Matrix 3x3 Interaktif
+        self.box_slot = GridLayout(
+            cols=3, rows=3, spacing=4, size_hint_y=0.42, padding=[8, 2, 8, 2]
+        )
+
+        self.slot_top1 = Label(text="[[] 8 ]", font_size="20sp", color=(0.6, 0.6, 0.6, 0.6), bold=True, halign="center", markup=True)
+        self.slot_top2 = Label(text="[[] 8 ]", font_size="20sp", color=(0.6, 0.6, 0.6, 0.6), bold=True, halign="center", markup=True)
+        self.slot_top3 = Label(text="[[] 8 ]", font_size="20sp", color=(0.6, 0.6, 0.6, 0.6), bold=True, halign="center", markup=True)
+
+        self.slot1 = Label(text="[color=fbbf24]>[/color]  [color=fbbf24]8[/color]", font_size="30sp", bold=True, halign="center", markup=True)
+        self.slot2 = Label(text="[color=fbbf24]8[/color]", font_size="30sp", bold=True, halign="center", markup=True)
+        self.slot3 = Label(text="[color=fbbf24]8[/color]  [color=fbbf24]<[/color]", font_size="30sp", bold=True, halign="center", markup=True)
+
+        self.slot_bot1 = Label(text="[[] 8 ]", font_size="20sp", color=(0.6, 0.6, 0.6, 0.6), bold=True, halign="center", markup=True)
+        self.slot_bot2 = Label(text="[[] 8 ]", font_size="20sp", color=(0.6, 0.6, 0.6, 0.6), bold=True, halign="center", markup=True)
+        self.slot_bot3 = Label(text="[[] 8 ]", font_size="20sp", color=(0.6, 0.6, 0.6, 0.6), bold=True, halign="center", markup=True)
+
+        self.box_slot.add_widget(self.slot_top1)
+        self.box_slot.add_widget(self.slot_top2)
+        self.box_slot.add_widget(self.slot_top3)
+
+        self.box_slot.add_widget(self.slot1)
+        self.box_slot.add_widget(self.slot2)
+        self.box_slot.add_widget(self.slot3)
+
+        self.box_slot.add_widget(self.slot_bot1)
+        self.box_slot.add_widget(self.slot_bot2)
+        self.box_slot.add_widget(self.slot_bot3)
+
+        self.utama.add_widget(self.banner_promo)
+
+        self.layar = BoxLayout(orientation="vertical", spacing=6, size_hint_y=0.40)
+        self.utama.add_widget(self.layar)
+        l.add_widget(self.utama)
+
+        Clock.schedule_once(lambda d: self.mulai_loading(), 0.1)
+
+        return l
+
+    def ganti_bahasa(self, b):
+        global BAHASA
+        BAHASA = "EN" if BAHASA == "ID" else "ID"
+        self.lbl_jackpot_sub.text = TEKS[BAHASA]["promo_win"]
+        self.mulai_menu()
+
+    def set_info_sementara(self, pesan, durasi=3.5):
+        self.info.text = pesan
+        Clock.unschedule(self._bersihkan_info)
+        Clock.schedule_once(self._bersihkan_info, durasi)
+
+    def _bersihkan_info(self, dt):
+        self.info.text = ""
+
+    # FUNGSI PEMANGGIL IKLAN REWARDED (ANDROID VS PC SIMULATOR)
+    def tunggu_iklan(self, lanjut_fungsi, beri_bonus=False):
+        mainkan_klik()
+        self.layar.clear_widgets()
+        self.info.text = "[color=77bbff]" + TEKS[BAHASA]["tunggu"] + "[/color]"
+
+        # JIKA BERJALAN DI HP ANDROID: MEMANGGIL ADMOB REWARDED AD
+        self._iklan_lanjut_fungsi = lanjut_fungsi
+        self._iklan_beri_bonus = beri_bonus
+
+        ad_shown = False
+        if hasattr(self, 'ads'):
+            try:
+                self.ads.show_rewarded_ad()
+                ad_shown = True
+            except Exception as e:
+                print(f"AdMob error: {e}")
+
+        if not ad_shown:
+            Clock.schedule_once(lambda d: self._iklan_selesai(), 0.8)
+
+    def _iklan_selesai(self):
+        lanjut_fungsi = self._iklan_lanjut_fungsi
+        beri_bonus = self._iklan_beri_bonus
+        bonus_poin = 0
+        if beri_bonus:
+            bonus_poin = randint(20, 80)
+            pemain["poin_saat_ini"] += bonus_poin
+            mainkan_poin()
+            self.simpan_tampil()
+
+        lanjut_fungsi()
+
+        if beri_bonus and bonus_poin > 0:
+            msg = TEKS[BAHASA]["bonus_iklan_wajib"].format(bonus_poin)
+            self.set_info_sementara(msg, 3.5)
+
+        if hasattr(self, 'ads'):
+            try:
+                self.ads.load_rewarded_ad(ADMOB_REWARDED_ID)
+            except Exception:
+                pass
+
+    def simpan_tampil(self):
+        tgl = str(date.today())
+        if pemain["tanggal_terakhir_penarikan"] != tgl:
+            pemain["jumlah_penarikan_hari_ini"] = 0
+            pemain["tanggal_terakhir_penarikan"] = tgl
+
+        str_uang = format_uang(pemain["penghasilan"], BAHASA)
+        self.saldo_lbl.text = (
+            "[b]"
+            + TEKS[BAHASA]["saldo"].format(pemain["poin_saat_ini"], str_uang)
+            + "[/b]\n"
+            + TEKS[BAHASA]["stat"].format(
+                pemain["jumlah_menang"],
+                pemain["jumlah_penarikan_hari_ini"],
+                MAKSIMAL_TARIK,
+            )
+        )
+        simpan_data(pemain)
+
+    def set_slot_3x3(self, top, mid, bot):
+        self.slot_top1.text = format_item_slot(top[0], False)
+        self.slot_top2.text = format_item_slot(top[1], False)
+        self.slot_top3.text = format_item_slot(top[2], False)
+
+        self.slot1.text = format_item_slot(mid[0], True, "left")
+        self.slot2.text = format_item_slot(mid[1], True, "center")
+        self.slot3.text = format_item_slot(mid[2], True, "right")
+
+        self.slot_bot1.text = format_item_slot(bot[0], False)
+        self.slot_bot2.text = format_item_slot(bot[1], False)
+        self.slot_bot3.text = format_item_slot(bot[2], False)
+
+    def tampilkan_banner_promo(self):
+        if self.box_slot in self.utama.children:
+            self.utama.remove_widget(self.box_slot)
+        if self.banner_promo not in self.utama.children:
+            self.utama.add_widget(self.banner_promo, index=1)
+
+    def tampilkan_grid_slot(self):
+        if self.banner_promo in self.utama.children:
+            self.utama.remove_widget(self.banner_promo)
+        if self.box_slot not in self.utama.children:
+            self.utama.add_widget(self.box_slot, index=1)
+
+    def layar_welcome_bonus(self):
+        mainkan_benar()
+        self.layar.clear_widgets()
+        self.info.text = (
+            "[color=34d399]" + TEKS[BAHASA]["welcome_desc"] + "[/color]"
+        )
+
+        box_bonus = BoxLayout(
+            orientation="vertical",
+            spacing=8,
+            size_hint_y=0.85
+        )
+
+        file_peti = "peti.png" if os.path.exists("peti.png") else ("peti.jpg" if os.path.exists("peti.jpg") else None)
+
+        if file_peti:
+            img_peti = Image(
+                source=file_peti,
+                size_hint_y=0.65,
+                allow_stretch=True,
+                keep_ratio=True
+            )
+            box_bonus.add_widget(img_peti)
+        else:
+            lbl_gift = Label(
+                text="[+]\n[b][color=fbbf24]+500 POIN[/color][/b]",
+                markup=True,
+                font_size="28sp",
+                halign="center",
+            )
+            box_bonus.add_widget(lbl_gift)
+
+        btn_klaim = Tombol(
+            text=TEKS[BAHASA]["welcome_claim"],
+            bg_color=(0.16, 0.65, 0.38, 1),
+            font_size="15sp",
+            size_hint_y=0.35,
+        )
+        def klaim_welcome(b):
+            mainkan_benar()
+            pemain["poin_saat_ini"] += 500
+            pemain["welcome_claimed"] = True
+            self.simpan_tampil()
+            self.mulai_menu()                               
+                                                        
+        btn_klaim.bind(on_press=klaim_welcome)
+        box_bonus.add_widget(btn_klaim)
+
+        self.layar.add_widget(box_bonus)
+
+    def mulai_menu(self):
+        mainkan_klik()
+        self.sisa_auto = 0
+        self.layar.clear_widgets()
+        self.simpan_tampil()
+        self.info.text = TEKS[BAHASA]["masukkan_taruhan"]
+        
+        self.tampilkan_banner_promo()
+
+        if self.ticker:
+            self.ticker.cancel()
+        daftar = DAFTAR_ID if BAHASA == "ID" else DAFTAR_EN
+        self.ticker = Clock.schedule_interval(
+            lambda d: setattr(self.berita, "text", choice(daftar)), 3.5
+        )
+
+        baris_opsi = BoxLayout(spacing=8, size_hint_y=0.20)
+        self.btn_bahasa = Tombol(
+            text=TEKS[BAHASA]["ubah_bahasa"], bg_color=(0.25, 0.3, 0.38, 1)
+        )
+        self.btn_bahasa.bind(on_press=self.ganti_bahasa)
+
+        self.btn_suara = Tombol(
+            text=TEKS[BAHASA]["tombol_suara"], bg_color=(0.25, 0.3, 0.38, 1)
+        )
+        self.btn_suara.bind(on_press=lambda b: self.menu_suara())
+
+        baris_opsi.add_widget(self.btn_bahasa)
+        baris_opsi.add_widget(self.btn_suara)
+        self.layar.add_widget(baris_opsi)
+
+        b1 = Tombol(
+            text=TEKS[BAHASA]["bermain"],
+            bg_color=(0.16, 0.65, 0.38, 1),
+            font_size="16sp",
+            size_hint_y=0.25,
+        )
+        b1.bind(
+            on_press=lambda b: self.tunggu_iklan(
+                self.buka_permainan, beri_bonus=True
+            )
+        )
+        self.layar.add_widget(b1)
+
+        baris_fitur = BoxLayout(spacing=8, size_hint_y=0.25)
+        b2 = Tombol(text=TEKS[BAHASA]["iklan"], bg_color=(0.85, 0.55, 0.1, 1))
+        b2.bind(on_press=lambda b: self.dapat_poin())
+        b3 = Tombol(text=TEKS[BAHASA]["tarik"], bg_color=(0.55, 0.23, 0.78, 1))
+        b3.bind(on_press=lambda b: self.menu_tarik())
+        baris_fitur.add_widget(b2)
+        baris_fitur.add_widget(b3)
+        self.layar.add_widget(baris_fitur)
+
+        baris_info = BoxLayout(spacing=8, size_hint_y=0.25)
+        b_catatan = Tombol(
+            text=TEKS[BAHASA]["catatan"], bg_color=(0.15, 0.39, 0.92, 1)
+        )
+        b_catatan.bind(on_press=lambda b: self.menu_catatan())
+        b_dukungan = Tombol(
+            text=TEKS[BAHASA]["dukungan"], bg_color=(0.15, 0.39, 0.92, 1)
+        )
+        b_dukungan.bind(on_press=lambda b: self.menu_dukungan())
+        baris_info.add_widget(b_catatan)
+        baris_info.add_widget(b_dukungan)
+        self.layar.add_widget(baris_info)
+
+    def menu_suara(self):
+        mainkan_klik()
+        self.layar.clear_widgets()
+        self.info.text = (
+            "[color=fbbf24]" + TEKS[BAHASA]["pengaturan_suara"] + "[/color]"
+        )
+
+        box_suara = BoxLayout(
+            orientation="vertical", spacing=8, size_hint_y=0.85
+        )
+
+        txt_m = (
+            TEKS[BAHASA]["musik_on"] if SUARA_MUSIK else TEKS[BAHASA]["musik_off"]
+        )
+        color_m = (0.16, 0.65, 0.38, 1) if SUARA_MUSIK else (0.75, 0.22, 0.22, 1)
+        btn_m = Tombol(text=txt_m, bg_color=color_m, size_hint_y=0.30)
+
+        txt_e = TEKS[BAHASA]["efek_on"] if SUARA_EFEK else TEKS[BAHASA]["efek_off"]
+        color_e = (0.16, 0.65, 0.38, 1) if SUARA_EFEK else (0.75, 0.22, 0.22, 1)
+        btn_e = Tombol(text=txt_e, bg_color=color_e, size_hint_y=0.30)
+
+        def toggle_musik(b):
+            global SUARA_MUSIK
+            SUARA_MUSIK = not SUARA_MUSIK
+            update_musik()
+            mainkan_klik()
+            self.menu_suara()
+
+        def toggle_efek(b):
+            global SUARA_EFEK
+            SUARA_EFEK = not SUARA_EFEK
+            mainkan_klik()
+            self.menu_suara()
+
+        btn_m.bind(on_press=toggle_musik)
+        btn_e.bind(on_press=toggle_efek)
+
+        box_suara.add_widget(btn_m)
+        box_suara.add_widget(btn_e)
+
+        kmb = Tombol(
+            text=TEKS[BAHASA]["kembali"],
+            bg_color=(0.3, 0.35, 0.4, 1),
+            size_hint_y=0.30,
+        )
+        kmb.bind(on_press=lambda b: self.mulai_menu())
+        box_suara.add_widget(kmb)
+
+        self.layar.add_widget(box_suara)
+
+    def buka_permainan(self):
+        if self.ticker:
+            self.ticker.cancel()
+        
+        self.tampilkan_grid_slot()
+
+        self.info.text = "DAPATKAN [color=fbbf24]POIN[/color], TUKAR MENJADI [color=34d399]HADIAH[/color] PADA LUCKY [color=fbbf24]888[/color] SPIN"
+
+        self.set_slot_3x3(['?', '?', '?'], ['?', '?', '?'], ['?', '?', '?'])
+        self.layar.clear_widgets()
+        self.taruhan = 10
+        self.sisa_auto = 0
+
+        self.input_taruh = Input(
+            text="10", hint_text=TEKS[BAHASA]["taruhan"], size_hint_y=0.22
+        )
+        self.layar.add_widget(self.input_taruh)
+
+        self.b_spin1 = Tombol(
+            text="SPIN 1x", bg_color=(0.16, 0.65, 0.38, 1), size_hint_y=0.25
+        )
+        self.b_spin1.bind(on_press=lambda b: self.cek_dan_spin(1))
+        self.layar.add_widget(self.b_spin1)
+
+        grid_auto = GridLayout(cols=5, spacing=4, size_hint_y=0.25)
+        for count in [10, 30, 50, 100, 200]:
+            btn = Tombol(text=f"{count}x", bg_color=(0.2, 0.4, 0.6, 1))
+            btn.bind(on_press=lambda inst, c=count: self.cek_dan_spin(c))
+            grid_auto.add_widget(btn)
+        self.layar.add_widget(grid_auto)
+
+        kmb = Tombol(
+            text=TEKS[BAHASA]["kembali"],
+            bg_color=(0.3, 0.35, 0.4, 1),
+            size_hint_y=0.22,
+        )
+        kmb.bind(
+            on_press=lambda b: self.tunggu_iklan(self.mulai_menu, beri_bonus=True)
+        )
+        self.layar.add_widget(kmb)
+
+    def cek_dan_spin(self, jumlah_spin):
+        try:
+            self.taruhan = int(self.input_taruh.text.strip())
+        except Exception:
+            self.info.text = "[color=f87171]" + TEKS[BAHASA]["isi_angka"] + "[/color]"
+            return
+
+        if self.taruhan < 10:
+            self.info.text = (
+                "[color=f87171]" + TEKS[BAHASA]["batas_taruh"] + "[/color]"
+            )
+            return
+
+        if pemain["poin_saat_ini"] < self.taruhan:
+            self.info.text = (
+                "[color=f87171]" + TEKS[BAHASA]["poin_kurang"] + "[/color]"
+            )
+            return
+
+        if self.sisa_auto > 0:
+            self.sisa_auto = 0
+            return
+
+        self.sisa_auto = jumlah_spin
+        self.b_spin1.text = "STOP"
+        self.jalan_loop_spin()
+
+    def jalan_loop_spin(self):
+        if self.sisa_auto <= 0 or pemain["poin_saat_ini"] < self.taruhan:
+            self.sisa_auto = 0
+            self.simpan_tampil()
+            return
+
+        pemain["poin_saat_ini"] -= self.taruhan
+        self.simpan_tampil()
+
+        self.langkah_sisa = 15
+        mainkan_putar()
+        self.jalankan_animasi_putar()
+
+    def jalankan_animasi_putar(self):
+        if self.langkah_sisa > 0:
+            top_rand = [randint(0, 9), randint(0, 9), randint(0, 9)]
+            mid_rand = [randint(0, 9), randint(0, 9), randint(0, 9)]
+            bot_rand = [randint(0, 9), randint(0, 9), randint(0, 9)]
+            
+            self.set_slot_3x3(top_rand, mid_rand, bot_rand)
+            self.langkah_sisa -= 1
+            Clock.schedule_once(lambda dt: self.jalankan_animasi_putar(), 0.08)
+        else:
+            self.kalkulasi_hasil_slot()
+
     def kalkulasi_hasil_slot(self):
         simbol = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9]
         bobot  = [9.6, 9.6, 9.6, 9.6, 9.6, 9.6, 9.6, 9.6, 13.5, 9.3]
@@ -427,7 +952,7 @@ class Aplikasi(App):
 
         if count_8 >= 1:
             mainkan_benar()
-
+            
             if count_8 == 3:
                 hadiah_rp = nilai_dasar_rp * 5
             elif count_8 == 2:
@@ -437,7 +962,7 @@ class Aplikasi(App):
 
             pemain["penghasilan"] += hadiah_rp
             pemain["jumlah_menang"] += 1
-
+            
             uang_str = format_uang(hadiah_rp, BAHASA)
 
             if count_8 == 3:
