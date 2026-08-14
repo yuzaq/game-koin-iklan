@@ -8,6 +8,7 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
+
     steps:
       - name: Checkout kode
         uses: actions/checkout@v4
@@ -15,20 +16,24 @@ jobs:
       - name: Setup Python
         uses: actions/setup-python@v5
         with:
-          python-version: '3.11'
+          python-version: '3.10'
 
-      - name: Install dependencies sistem
+      - name: Install dependensi sistem lengkap
         run: |
           sudo apt update
-          sudo apt install -y git zip unzip openjdk-17-jdk python3-pip autoconf automake autoconf-archive libtool libltdl-dev pkg-config zlib1g-dev libncurses5-dev cmake libffi-dev libssl-dev build-essential gettext m4
+          sudo apt install -y \
+            git zip unzip openjdk-17-jdk python3-pip \
+            autoconf automake autoconf-archive libtool libltdl-dev \
+            build-essential libssl-dev libffi-dev zlib1g-dev \
+            ccache lld cmake libsqlite3-dev
 
       - name: Install Buildozer & Cython
         run: |
-          pip install --upgrade buildozer cython==0.29.36
+          python -m pip install --upgrade pip
+          pip install cython==0.29.36
+          pip install --upgrade buildozer
 
       - name: Build APK dengan Buildozer
-        env:
-          PIP_CONSTRAINT: ${{ github.workspace }}/constraints-pip.txt
         run: |
           yes | buildozer android debug
 
