@@ -408,9 +408,9 @@ def format_item_slot(item, is_mid=False, pos="center"):
             return val
     else:
         if item_str == '8':
-            return "[color=fbbf24][[] 8 ][/color]"
+            return f"[color=fbbf24]{item_str}[/color]"
         else:
-            return f"[[] {item_str} ]"
+            return f"[color=888888]{item_str}[/color]"
 
 class CardBox(BoxLayout):
     def __init__(self, **kw):
@@ -470,8 +470,12 @@ class RewardsHandler(RewardedListenerInterface):
 
     def on_rewarded_video_ad_closed(self):
         pass
-
-class Aplikasi(App):
+        
+    def on_rewarded_video_ad_failed_to_load(self, error_code):
+        Clock.schedule_once(
+            lambda dt: self.app_ref._iklan_gagal_load(error_code), 0
+        )
+        class Aplikasi(App):
     def on_start(self):
         try:
             self.ads = KivMob(ADMOB_APP_ID)
@@ -482,12 +486,7 @@ class Aplikasi(App):
             self.ads.set_rewarded_ad_listener(RewardsHandler(self))
             self.ads.load_rewarded_ad(ADMOB_REWARDED_ID)
         except Exception as e:
-            pesan_error = f"AdMob init error: {e}"
-            print(pesan_error)
-            def tampilkan(dt):
-                self.debug_status.height = '40dp'
-                self.debug_status.text = f"[color=ff4444]{pesan_error}[/color]"
-            Clock.schedule_once(tampilkan, 0)
+            print(f"Gagal Inisialisasi AdMob: {e}")
 
         sinkronkan_data_online(lambda: self.simpan_tampil())
 
@@ -495,9 +494,10 @@ class Aplikasi(App):
         Clock.schedule_once(lambda d: muat_suara(), 0.5)
         self.ticker = None
         self.metode_terpilih = "OVO"
-        self.nominal_terpilih = 100
+        self.nominal_terpilih = 5000
         self.sisa_auto = 0
         self.bonus_kotak_terakhir = 0
+        self.spin_gratis_tersisa = 5
 
         l = BoxLayout(orientation="vertical", padding=10, spacing=6)
 
@@ -548,16 +548,6 @@ class Aplikasi(App):
         )
         self.banner_ad_container.add_widget(lbl_placeholder)
         l.add_widget(self.banner_ad_container)
-        
-        self.debug_status = Label(
-            text="",
-            markup=True,
-            font_size="10sp",
-            size_hint_y=None,
-            height='0dp',
-            halign="center",
-        )
-        l.add_widget(self.debug_status)
 
         # 3. SALDO & STATUS
         self.saldo_lbl = Label(
@@ -696,10 +686,7 @@ class Aplikasi(App):
                 self.ads.show_rewarded_ad()
                 ad_shown = True
             except Exception as e:
-                pesan_error = f"AdMob rewarded error: {e}"
-                print(pesan_error)
-                self.debug_status.height = '40dp'
-                self.debug_status.text = f"[color=ff4444]{pesan_error}[/color]"
+                print(f"AdMob error: {e}")
 
         # Batas waktu tunggu supaya tidak macet kalau iklan gagal/belum siap
         timeout = 6 if ad_shown else 0.8
@@ -730,6 +717,20 @@ class Aplikasi(App):
                 self.ads.load_rewarded_ad(ADMOB_REWARDED_ID)
             except Exception:
                 pass
+                
+        if getattr(self, 'ads_error', None):
+            Clock.schedule_once(
+                lambda dt: self.set_info_sementara(
+                    f"[color=f87171]DEBUG: {self.ads_error}[/color]", 6
+                ),
+                0.3,
+            )
+            self.ads_error = None
+                
+    def _iklan_gagal_load(self, error_code):
+        self.ads_error = f"Kode Error AdMob: {error_code}"
+        print(self.ads_error)
+        
 
     def simpan_tampil(self):
         tgl = str(date.today())
@@ -948,18 +949,25 @@ class Aplikasi(App):
     def buka_permainan(self):
         if self.ticker:
             self.ticker.cancel()
-        
+
         self.tampilkan_grid_slot()
 
         self.info.text = "DAPATKAN [color=fbbf24]POIN[/color], TUKAR MENJADI [color=34d399]HADIAH[/color] PADA LUCKY [color=fbbf24]888[/color] SPIN"
 
         self.set_slot_3x3(['?', '?', '?'], ['?', '?', '?'], ['?', '?', '?'])
-        self.layar.clear_widgets()
         self.taruhan = 10
         self.sisa_auto = 0
+        self.klik_spin1_counter = 0
+
+        self.tampilkan_kontrol_spin()
+
+    def tampilkan_kontrol_spin(self):
+        """Bangun ulang tombol layar spin (dipanggil juga setelah iklan
+        selesai, karena layar sempat dikosongkan)."""
+        self.layar.clear_widgets()
 
         self.input_taruh = Input(
-            text="10", hint_text=TEKS[BAHASA]["taruhan"], size_hint_y=0.22
+            text=str(self.taruhan), hint_text=TEKS[BAHASA]["taruhan"], size_hint_y=0.22
         )
         self.layar.add_widget(self.input_taruh)
 
@@ -969,8 +977,8 @@ class Aplikasi(App):
         self.b_spin1.bind(on_press=lambda b: self.cek_dan_spin(1))
         self.layar.add_widget(self.b_spin1)
 
-        grid_auto = GridLayout(cols=5, spacing=4, size_hint_y=0.25)
-        for count in [10, 30, 50, 100, 200]:
+        grid_auto = GridLayout(cols=3, spacing=4, size_hint_y=0.25)
+        for count in [10, 50, 100]:
             btn = Tombol(text=f"{count}x", bg_color=(0.2, 0.4, 0.6, 1))
             btn.bind(on_press=lambda inst, c=count: self.cek_dan_spin(c))
             grid_auto.add_widget(btn)
@@ -1009,9 +1017,29 @@ class Aplikasi(App):
             self.sisa_auto = 0
             return
 
+        if jumlah_spin == 1:
+            self.klik_spin1_counter += 1
+            if self.klik_spin1_counter % 10 == 0:
+                self.tunggu_iklan(
+                    lambda: self._mulai_spin_setelah_iklan(jumlah_spin),
+                    beri_bonus=True,
+                )
+                return
+            self._mulai_spin(jumlah_spin)
+        else:
+            # Spin otomatis (10x/50x/100x): wajib nonton iklan dulu tiap kali dipakai
+            self.tunggu_iklan(
+                lambda: self._mulai_spin_setelah_iklan(jumlah_spin), beri_bonus=True
+            )
+
+    def _mulai_spin(self, jumlah_spin):
         self.sisa_auto = jumlah_spin
         self.b_spin1.text = "STOP"
         self.jalan_loop_spin()
+
+    def _mulai_spin_setelah_iklan(self, jumlah_spin):
+        self.tampilkan_kontrol_spin()
+        self._mulai_spin(jumlah_spin)
 
     def jalan_loop_spin(self):
         if self.sisa_auto <= 0 or pemain["poin_saat_ini"] < self.taruhan:
