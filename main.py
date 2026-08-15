@@ -916,7 +916,7 @@ class Aplikasi(App):
         color_e = (0.16, 0.65, 0.38, 1) if SUARA_EFEK else (0.75, 0.22, 0.22, 1)
         btn_e = Tombol(text=txt_e, bg_color=color_e, size_hint_y=0.30)
 
-                def toggle_musik(b):
+        def toggle_musik(b):
             global SUARA_MUSIK
             SUARA_MUSIK = not SUARA_MUSIK
             update_musik()
