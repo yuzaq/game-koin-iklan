@@ -475,8 +475,10 @@ class RewardsHandler(RewardedListenerInterface):
         Clock.schedule_once(
             lambda dt: self.app_ref._iklan_gagal_load(error_code), 0
         )
-        class Aplikasi(App):
+        
+class Aplikasi(App):
     def on_start(self):
+        self.ads_error = None
         try:
             self.ads = KivMob(ADMOB_APP_ID)
             self.ads.new_banner(ADMOB_BANNER_ID, True)
