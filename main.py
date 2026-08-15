@@ -3,13 +3,71 @@ import os
 import hashlib
 import urllib.parse
 import urllib.request
+import uuid
+import requests
 from datetime import date
 from random import choice, randint, choices
 from threading import Thread
-
-# Import platform Kivy untuk deteksi Android vs PC
-from kivy.utils import platform
 from kivmob import KivMob, RewardedListenerInterface
+from kivy.utils import platform
+
+# URL utama Firebase kamu
+FIREBASE_URL = "https://triple8spin-default-rtdb.firebaseio.com"
+
+
+# 1. FUNGSI UNTUK MENDAPATKAN ID UNIK PEMAIN (khusus HP ini)
+def dapatkan_id_pemain():
+    file_id = "user_id.txt"
+    if os.path.exists(file_id):
+        with open(file_id, "r") as f:
+            return f.read().strip()
+    else:
+        id_baru = f"player_{uuid.uuid4().hex[:8]}"
+        with open(file_id, "w") as f:
+            f.write(id_baru)
+        return id_baru
+
+ID_PEMAIN = dapatkan_id_pemain()
+
+
+# 2. FUNGSI KIRIM DATA ONLINE (VERSI AMAN / ANTI-CHEAT)
+def simpan_data_online(id_pemain, data_dict):
+    """Menyimpan saldo dan data pemain langsung ke Server Firebase"""
+    if data_dict.get("poin_saat_ini", 0) < 0:
+        data_dict["poin_saat_ini"] = 0
+
+    try:
+        url = f"{FIREBASE_URL}/pemain/{id_pemain}.json"
+        response = requests.put(url, json=data_dict, timeout=5)
+
+        if response.status_code == 200:
+            print("[FIREBASE] Data berhasil disimpan secara online!")
+            return True
+        else:
+            print("Gagal simpan ke Firebase:", response.status_code)
+            return False
+    except Exception as e:
+        print("Koneksi internet bermasalah, gagal terhubung ke server:", e)
+        return False
+
+
+# 3. FUNGSI AMBIL DATA ONLINE
+def muat_data_online(id_pemain):
+    """Membaca saldo pemain langsung dari Server Firebase"""
+    try:
+        url = f"{FIREBASE_URL}/pemain/{id_pemain}.json"
+        response = requests.get(url, timeout=5)
+
+        if response.status_code == 200 and response.json() is not None:
+            print("[FIREBASE] Data berhasil dimuat dari server!")
+            return response.json()
+        else:
+            print("Buka pemain baru / data tidak ditemukan.")
+            return None
+    except Exception as e:
+        print("Gagal mengambil data online:", e)
+        return None
+
 
 # ==============================================
 # KONFIGURASI GOOGLE ADMOB (TEST ID RESMI GOOGLE)
@@ -212,8 +270,8 @@ DAFTAR_EN = [
     "User_5512 just withdrew Rp 1.000 via OVO!",
 ]
 
-def muat_data():
-    default = {
+def data_pemain_default():
+    return {
         "poin_saat_ini": 1000,
         "penghasilan": 0,
         "jumlah_menang": 0,
@@ -223,6 +281,11 @@ def muat_data():
         "welcome_claimed": False,
         "no_hp": "",
     }
+
+def muat_data():
+    """Muat data LOKAL dulu (instan, tidak perlu tunggu internet).
+    Data online disinkronkan belakangan lewat sinkronkan_data_online()."""
+    default = data_pemain_default()
     if not os.path.exists(FILE_DATA):
         return default
     try:
@@ -230,9 +293,22 @@ def muat_data():
             data = json.load(f)
             if data.get('checksum') != buat_hash(data):
                 return default
-            return data
+            return {**default, **data}
     except Exception:
         return default
+
+def sinkronkan_data_online(callback_selesai=None):
+    """Ambil data dari Firebase di background thread, supaya tidak bikin
+    tampilan macet menunggu koneksi internet."""
+    def tugas():
+        data_online = muat_data_online(ID_PEMAIN)
+        if data_online:
+            data_gabungan = {**data_pemain_default(), **data_online}
+            pemain.update(data_gabungan)
+            simpan_data(pemain)
+        if callback_selesai:
+            Clock.schedule_once(lambda dt: callback_selesai(), 0)
+    Thread(target=tugas, daemon=True).start()
 
 def simpan_data(data):
     try:
@@ -406,7 +482,14 @@ class Aplikasi(App):
             self.ads.set_rewarded_ad_listener(RewardsHandler(self))
             self.ads.load_rewarded_ad(ADMOB_REWARDED_ID)
         except Exception as e:
-            print(f"Gagal Inisialisasi AdMob: {e}")
+            pesan_error = f"AdMob init error: {e}"
+            print(pesan_error)
+            def tampilkan(dt):
+                self.debug_status.height = '40dp'
+                self.debug_status.text = f"[color=ff4444]{pesan_error}[/color]"
+            Clock.schedule_once(tampilkan, 0)
+
+        sinkronkan_data_online(lambda: self.simpan_tampil())
 
     def build(self):
         Clock.schedule_once(lambda d: muat_suara(), 0.5)
@@ -465,6 +548,16 @@ class Aplikasi(App):
         )
         self.banner_ad_container.add_widget(lbl_placeholder)
         l.add_widget(self.banner_ad_container)
+        
+        self.debug_status = Label(
+            text="",
+            markup=True,
+            font_size="10sp",
+            size_hint_y=None,
+            height='0dp',
+            halign="center",
+        )
+        l.add_widget(self.debug_status)
 
         # 3. SALDO & STATUS
         self.saldo_lbl = Label(
@@ -593,9 +686,9 @@ class Aplikasi(App):
         self.layar.clear_widgets()
         self.info.text = "[color=77bbff]" + TEKS[BAHASA]["tunggu"] + "[/color]"
 
-        # JIKA BERJALAN DI HP ANDROID: MEMANGGIL ADMOB REWARDED AD
         self._iklan_lanjut_fungsi = lanjut_fungsi
         self._iklan_beri_bonus = beri_bonus
+        self._iklan_sudah_jalan = False
 
         ad_shown = False
         if hasattr(self, 'ads'):
@@ -603,12 +696,20 @@ class Aplikasi(App):
                 self.ads.show_rewarded_ad()
                 ad_shown = True
             except Exception as e:
-                print(f"AdMob error: {e}")
+                pesan_error = f"AdMob rewarded error: {e}"
+                print(pesan_error)
+                self.debug_status.height = '40dp'
+                self.debug_status.text = f"[color=ff4444]{pesan_error}[/color]"
 
-        if not ad_shown:
-            Clock.schedule_once(lambda d: self._iklan_selesai(), 0.8)
+        # Batas waktu tunggu supaya tidak macet kalau iklan gagal/belum siap
+        timeout = 6 if ad_shown else 0.8
+        Clock.schedule_once(lambda d: self._iklan_selesai(), timeout)
 
     def _iklan_selesai(self):
+        if getattr(self, '_iklan_sudah_jalan', False):
+            return
+        self._iklan_sudah_jalan = True
+
         lanjut_fungsi = self._iklan_lanjut_fungsi
         beri_bonus = self._iklan_beri_bonus
         bonus_poin = 0
@@ -648,6 +749,10 @@ class Aplikasi(App):
             )
         )
         simpan_data(pemain)
+
+        # Sinkronkan ke Firebase di background thread, supaya tidak nge-lag
+        data_kirim = dict(pemain)
+        Thread(target=simpan_data_online, args=(ID_PEMAIN, data_kirim), daemon=True).start()
 
     def set_slot_3x3(self, top, mid, bot):
         self.slot_top1.text = format_item_slot(top[0], False)
@@ -811,7 +916,7 @@ class Aplikasi(App):
         color_e = (0.16, 0.65, 0.38, 1) if SUARA_EFEK else (0.75, 0.22, 0.22, 1)
         btn_e = Tombol(text=txt_e, bg_color=color_e, size_hint_y=0.30)
 
-        def toggle_musik(b):
+                def toggle_musik(b):
             global SUARA_MUSIK
             SUARA_MUSIK = not SUARA_MUSIK
             update_musik()
@@ -932,6 +1037,7 @@ class Aplikasi(App):
             Clock.schedule_once(lambda dt: self.jalankan_animasi_putar(), 0.08)
         else:
             self.kalkulasi_hasil_slot()
+
 
     def kalkulasi_hasil_slot(self):
         simbol = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9]
