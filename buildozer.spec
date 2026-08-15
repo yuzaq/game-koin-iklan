@@ -209,7 +209,7 @@ android.permissions = INTERNET, ACCESS_NETWORK_STATE, (name=android.permission.W
 #android.add_resources =
 
 # (list) Gradle dependencies to add
-android.gradle_dependencies = com.google.android.gms:play-services-ads:23.0.0
+android.gradle_dependencies = com.google.android.gms:play-services-ads:19.8.0
 
 # (bool) Enable AndroidX support. Enable when 'android.gradle_dependencies'
 # contains an 'androidx' package, or any package from Kotlin source.
