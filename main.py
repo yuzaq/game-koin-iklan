@@ -478,19 +478,19 @@ class RewardsHandler(RewardedListenerInterface):
         
 class Aplikasi(App):
     def on_start(self):
-        self.ads_error = None
-        try:
-            self.ads = KivMob(ADMOB_APP_ID)
-            self.ads.new_banner(ADMOB_BANNER_ID, True)
-            self.ads.request_banner()
-            self.ads.show_banner()
+    self.ads_error = None
+    try:
+        self.ads = KivMob(ADMOB_APP_ID)
+        self.ads.new_banner(ADMOB_BANNER_ID, True)
+        self.ads.request_banner()
+        self.ads.show_banner()
+        self.ads.set_rewarded_ad_listener(RewardsHandler(self))
+        self.ads.load_rewarded_ad(ADMOB_REWARDED_ID)
+    except Exception as e:
+        pesan_error = f"[color=f87171]INIT ADMOB GAGAL: {e}[/color]"
+        Clock.schedule_once(lambda dt: self.set_info_sementara(pesan_error, 8), 1)
 
-            self.ads.set_rewarded_ad_listener(RewardsHandler(self))
-            self.ads.load_rewarded_ad(ADMOB_REWARDED_ID)
-        except Exception as e:
-            print(f"Gagal Inisialisasi AdMob: {e}")
-
-        sinkronkan_data_online(lambda: self.simpan_tampil())
+    sinkronkan_data_online(lambda: self.simpan_tampil())
 
     def build(self):
         Clock.schedule_once(lambda d: muat_suara(), 0.5)
@@ -674,26 +674,24 @@ class Aplikasi(App):
 
     # FUNGSI PEMANGGIL IKLAN REWARDED (ANDROID VS PC SIMULATOR)
     def tunggu_iklan(self, lanjut_fungsi, beri_bonus=False):
-        mainkan_klik()
-        self.layar.clear_widgets()
-        self.info.text = "[color=77bbff]" + TEKS[BAHASA]["tunggu"] + "[/color]"
+    mainkan_klik()
+    self.layar.clear_widgets()
+    self.info.text = "[color=77bbff]" + TEKS[BAHASA]["tunggu"] + "[/color]"
+    self._iklan_lanjut_fungsi = lanjut_fungsi
+    self._iklan_beri_bonus = beri_bonus
+    self._iklan_sudah_jalan = False
 
-        self._iklan_lanjut_fungsi = lanjut_fungsi
-        self._iklan_beri_bonus = beri_bonus
-        self._iklan_sudah_jalan = False
+    ad_shown = False
+    if hasattr(self, 'ads'):
+        try:
+            self.ads.show_rewarded_ad()
+            ad_shown = True
+        except Exception as e:
+            self.ads_error = f"SHOW AD GAGAL: {e}"
 
-        ad_shown = False
-        if hasattr(self, 'ads'):
-            try:
-                self.ads.show_rewarded_ad()
-                ad_shown = True
-            except Exception as e:
-                print(f"AdMob error: {e}")
-
-        # Batas waktu tunggu supaya tidak macet kalau iklan gagal/belum siap
-        timeout = 6 if ad_shown else 0.8
-        Clock.schedule_once(lambda d: self._iklan_selesai(), timeout)
-
+    timeout = 6 if ad_shown else 0.8
+    Clock.schedule_once(lambda d: self._iklan_selesai(), timeout)
+    
     def _iklan_selesai(self):
         if getattr(self, '_iklan_sudah_jalan', False):
             return
