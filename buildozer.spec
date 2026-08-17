@@ -70,10 +70,8 @@ orientation = portrait
 #
 # OSX Specific
 #
-
 #
 # author = © Copyright Info
-
 # Kivy version to use
 osx.kivy_version = 2.2.0
 
@@ -109,10 +107,10 @@ android.permissions = INTERNET, ACCESS_NETWORK_STATE, (name=android.permission.W
 #android.features = android.hardware.usb.host
 
 # (int) Target Android API, should be as high as possible.
-#android.api = 33
+android.api = 33
 
 # (int) Minimum API your APK / AAB will support.
-#android.minapi = 24
+android.minapi = 21
 
 # (int) Android SDK version to use
 #android.sdk = 20
@@ -201,36 +199,37 @@ android.permissions = INTERNET, ACCESS_NETWORK_STATE, (name=android.permission.W
 # Some examples:
 # 1) A file to add to resources, legal resource names contain ['a-z','0-9','_']
 # android.add_resources = my_icons/all-inclusive.png:drawable/all_inclusive.png
-# 2) A directory, here  'legal_icons' must contain resources of one kind
+# 2) A directory, here 'legal_icons' must contain resources of one kind
 # android.add_resources = legal_icons:drawable
-# 3) A directory, here 'legal_resources' must contain one or more directories, 
-# each of a resource kind:  drawable, xml, etc...
+# 3) A directory, here 'legal_resources' must contain one or more directories,
+# each of a resource kind: drawable, xml, etc...
 # android.add_resources = legal_resources
 #android.add_resources =
 
 # (list) Gradle dependencies to add
-android.gradle_dependencies = com.google.android.gms:play-services-ads:19.8.0
+android.gradle_dependencies = com.google.android.gms:play-services-ads:22.6.0
 
 # (bool) Enable AndroidX support. Enable when 'android.gradle_dependencies'
 # contains an 'androidx' package, or any package from Kotlin source.
 # android.enable_androidx requires android.api >= 28
 android.enable_androidx = True
+
 p4a.branch = master
 
 # (list) add java compile options
 # this can for example be necessary when importing certain java libraries using the 'android.gradle_dependencies' option
 # see https://developer.android.com/studio/write/java8-support for further information
-# android.add_compile_options = "sourceCompatibility = 1.8", "targetCompatibility = 1.8"
+android.add_compile_options = "sourceCompatibility = 1.8", "targetCompatibility = 1.8"
 
 # (list) Gradle repositories to add {can be necessary for some android.gradle_dependencies}
-# please enclose in double quotes 
+# please enclose in double quotes
 # e.g. android.gradle_repositories = "maven { url 'https://repo.spring.io/release' }"
 #android.add_gradle_repositories =
 
 # (list) packaging options to add
 # see https://developer.android.com/reference/tools/gradle-api/7.1/com/android/build/api/dsl/PackagingOptions
 # can be necessary to solve conflicts in gradle_dependencies
-# please enclose in double quotes 
+# please enclose in double quotes
 # e.g. android.add_packaging_options = "exclude 'META-INF/common.kotlin_module'", "exclude 'META-INF/*.kotlin_module'"
 #android.add_packaging_options =
 
@@ -367,8 +366,6 @@ android.allow_backup = True
 # (str) extra command line arguments to pass when invoking pythonforandroid.toolchain
 #p4a.extra_args =
 
-
-
 #
 # iOS specific
 #
@@ -411,12 +408,11 @@ ios.codesign.allowed = false
 # (str) Camera Usage justification string.
 #ios.camera_usage_description = "<App> uses Camera to do <X and Y and Z>"
 
-
 # (bool) Allow StatusBar to be controlled by API
 # ios.viewcontroller_based_statusbar_appearance = False
 
 # (str) A Xml String specifying a extension type.
-#ios.app_extensions = [["7zip", "zip"],  ["public.zip-archive"], "org.kivy.myappextensionfile", "<MyCustom> Extension File", "${MACOSX_BUNDLE_ICON_FILE}", "http://mysite.com/myapp/extensions.html"],
+#ios.app_extensions = [["7zip", "zip"], ["public.zip-archive"], "org.kivy.myappextensionfile", "<MyCustom> Extension File", "${MACOSX_BUNDLE_ICON_FILE}", "http://mysite.com/myapp/extensions.html"],
 
 # (str) URL pointing to .ipa file to be installed
 # This option should be defined along with `display_image_url` and `full_size_image_url` options.
@@ -429,7 +425,6 @@ ios.codesign.allowed = false
 # (str) URL pointing to a large icon (512x512px) to be used by iTunes
 # This option should be defined along with `app_url` and `display_image_url` options.
 #ios.manifest.full_size_image_url =
-
 
 [buildozer]
 
@@ -445,54 +440,40 @@ warn_on_root = 1
 # (str) Path to build output (i.e. .apk, .aab, .ipa) storage
 # bin_dir = ./bin
 
-#-----------------------------------------------------------------------------
-#   Notes about using this file:
+#    -----------------------------------------------------------------------
+# List as sections
 #
-#   Buildozer uses a variant of Python's ConfigSpec to read this file.
-#   For the basic syntax, including interpolations, see
-#       https://docs.python.org/3/library/configparser.html#supported-ini-file-structure
+# You can define all the "list" as [section:key].
+# Each line will be considered as a option to the list.
+# Let's take [app] / source.exclude_patterns.
+# Instead of doing:
 #
-#   Warning: Comments cannot be used "inline" - i.e.
-#       [app]
-#       title = My Application # This is not a comment, it is part of the title.
+#     [app]
+#     source.exclude_patterns = license,data/audio/*.wav,data/images/original/*
 #
-#   Warning: Indented text is treated as a multiline string - i.e.
-#       [app]
-#       title = My Application
-#          package.name = myapp # This is all part of the title.
+# This can be translated into:
 #
-#   Buildozer's .spec files have some additional features:
+#     [app:source.exclude_patterns]
+#     license
+#     data/audio/*.wav
+#     data/images/original/*
 #
-#   Buildozer supports lists - i.e.
-#       [app]
-#       source.include_exts = py,png,jpg
-#       #                     ^ This is a list.
+
 #
-#       [app:source.include_exts]
-#       py
-#       png
-#       jpg
-#       # ^ This is an alternative syntax for a list.
+#    -----------------------------------------------------------------------
+# Profiles
 #
-#   Buildozer's option names are case-sensitive, unlike most .ini files.
+# You can extend section / key with a profile
+# For example, you want to deploy a demo version of your application without
+# HD content. You could first change the title to add "(demo)" in the name
+# and extend the excluded directories to remove the HD content.
 #
-#   Buildozer supports overriding options through environment variables.
-#   Name an environment variable as SECTION_OPTION to override a value in a .spec
-#   file.
+# [app@demo]
+# title = My Application (demo)
 #
-#   Buildozer support overriding options through profiles.
-#   For example, you want to deploy a demo version of your application without
-#   HD content. You could first change the title to add "(demo)" in the name
-#   and extend the excluded directories to remove the HD content.
+# [app:source.exclude_patterns@demo]
+# images/hd/*
 #
-#       [app@demo]
-#       title = My Application (demo)
+# Then, invoke the command line with the "demo" profile:
 #
-#       [app:source.exclude_patterns@demo]
-#       images/hd/*
-#
-#   Then, invoke the command line with the "demo" profile:
-#
-#        buildozer --profile demo android debug
-#
-#   Environment variable overrides have priority over profile overrides.
+# buildozer --profile demo android debug
