@@ -998,6 +998,8 @@ class Aplikasi(App):
         try:
             self.taruhan = int(self.input_taruh.text.strip())
         except Exception:
+            pass
+            
             self.info.text = "[color=f87171]" + TEKS[BAHASA]["isi_angka"] + "[/color]"
             return
 
