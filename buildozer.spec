@@ -101,8 +101,7 @@ fullscreen = 0
 
 # (list) Permissions
 # (See https://python-for-android.readthedocs.io/en/latest/buildoptions.html for all the supported syntaxes and properties)
-android.permissions = INTERNET, ACCESS_NETWORK_STATE, (name=android.permission.WRITE_EXTERNAL_STORAGE;maxSdkVersion=18)
-
+android.permissions = INTERNET, ACCESS_NETWORK_STATE
 # (list) features (adds uses-feature -tags to manifest)
 #android.features = android.hardware.usb.host
 
@@ -207,7 +206,7 @@ android.minapi = 21
 #android.add_resources =
 
 # (list) Gradle dependencies to add
-android.gradle_dependencies = com.google.android.gms:play-services-ads:19.7.0
+android.gradle_dependencies = com.google.android.gms:play-services-ads:22.3.0
 
 # (bool) Enable AndroidX support. Enable when 'android.gradle_dependencies'
 # contains an 'androidx' package, or any package from Kotlin source.
@@ -223,8 +222,7 @@ android.add_compile_options = "sourceCompatibility = 1.8", "targetCompatibility 
 
 # (list) Gradle repositories to add {can be necessary for some android.gradle_dependencies}
 # please enclose in double quotes
-# e.g. android.gradle_repositories = "maven { url 'https://repo.spring.io/release' }"
-#android.add_gradle_repositories =
+android.add_gradle_repositories = "google()", "mavenCentral()"
 
 # (list) packaging options to add
 # see https://developer.android.com/reference/tools/gradle-api/7.1/com/android/build/api/dsl/PackagingOptions
