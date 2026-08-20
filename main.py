@@ -452,8 +452,10 @@ class Input(TextInput):
         self.font_size = "18sp"
         self.bold = True
         self.halign = "center"
-        self.foreground_color = (0.35, 0.2, 0.55, 1)
-        self.background_color = (1, 0.96, 0.85, 1)
+        self.foreground_color = (0.83, 0.68, 0.21, 1)  # Warna Gold/Emas untuk teks
+        self.background_color = (0.2, 0.2, 0.2, 1)     # Warna Abu-abu gelap untuk background
+        self.background_normal = ''                     # Agar warna solid tampil akurat
+        self.background_active = ''                     # Agar warna solid tampil akurat
         self.multiline = False
         self.padding = [10, 8, 10, 8]
 
@@ -476,7 +478,7 @@ class RewardsHandler(RewardedListenerInterface):
     def on_rewarded_video_ad_failed_to_load(self, error_code):
         Clock.schedule_once(
             lambda dt: self.app_ref._iklan_gagal_load(error_code), 0
-    )
+        )
 
 #___________________________________
 class Aplikasi(App):
@@ -563,13 +565,39 @@ class Aplikasi(App):
             height='40dp',
             halign="center",
         )
+        
+        # Tambahkan canvas untuk latar belakang berwarna pada area saldo
+        with self.saldo_lbl.canvas.before:
+            Color(0.15, 0.15, 0.18, 0.9)  # Warna latar belakang abu-abu gelap elegan
+            self.bg_saldo = RoundedRectangle(
+                pos=self.saldo_lbl.pos, 
+                size=self.saldo_lbl.size, 
+                radius=[8,]
+            )
+            
+        def update_bg_saldo(instance, value):
+            self.bg_saldo.pos = instance.pos
+            self.bg_saldo.size = instance.size
+            
+        self.saldo_lbl.bind(pos=update_bg_saldo, size=update_bg_saldo)
         l.add_widget(self.saldo_lbl)
+
 
         # 4. KOTAK KONTEN UTAMA
         self.utama = CardBox(
             orientation="vertical", padding=[8, 45, 8, 8], spacing=4, size_hint_y=1.0
         )
         self.utama.bg_color.rgba = (0.08, 0.08, 0.08, 1) # Override bg menjadi gelap
+        self.btn_poin_cepat = Tombol(
+        text=TEKS[BAHASA]["iklan"],
+        bg_color=(0.85, 0.55, 0, 1),
+        font_size="12sp",
+        size_hint_y=None,
+        height='36dp',
+        )
+        self.btn_poin_cepat.bind(on_press=lambda b: self.dapat_poin())
+        self.utama.add_widget(self.btn_poin_cepat)
+
 
         self.info = Label(
             text="",
@@ -597,21 +625,12 @@ class Aplikasi(App):
             pos=lambda inst, val: setattr(self.berita_bg, "pos", val),
             size=lambda inst, val: setattr(self.berita_bg, "size", val),
         )
-
-        self.btn_poin_cepat = Tombol(
-            text="+ POIN (Tonton Iklan)",
-            bg_color=(0.85, 0.55, 0, 1), # Oranye solid yang lebih elegan
-            font_size="12sp",
-        )
-        self.btn_poin_cepat.bind(
-            on_press=lambda b: self.tunggu_iklan(
-                self.tampilkan_kontrol_spin, beri_bonus=True
-            )
-        )
-
+        
+                # Masukkan berita ke dalam slot_notif, lalu masukkan slot_notif ke utama
         self.slot_notif.add_widget(self.berita)
         self.utama.add_widget(self.slot_notif)
-        
+
+            
         self.pemisah = Widget(size_hint_y=None, height="2dp")
         with self.pemisah.canvas:
             Color(0.83, 0.68, 0.21, 1) # Garis pemisah warna emas
@@ -864,13 +883,14 @@ class Aplikasi(App):
             self.utama.remove_widget(self.banner_promo)
         if self.box_slot not in self.utama.children:
             self.utama.add_widget(self.box_slot, index=1)
-        self.slot_notif.clear_widgets()
-        self.slot_notif.add_widget(self.btn_poin_cepat)
+        
+        # BARIS 879 & 880 (clear_widgets dan add_widget btn_poin_cepat) DIHAPUS DARI SINI
+        
         self.box_slot.size_hint_y = 0.58
         self.info.size_hint_y = 0.16
         self.info.font_size = "10sp"
-        if self.pemisah not in self.utama.children:            
-            self.utama.add_widget(self.pemisah, index=1)        
+        if self.pemisah not in self.utama.children:
+            self.utama.add_widget(self.pemisah, index=1)
 
 #_________________________________
     def layar_welcome_bonus(self):
@@ -924,8 +944,11 @@ class Aplikasi(App):
         self.layar.add_widget(box_bonus)
 
     def mulai_menu(self):
+        self.asal_halaman = "menu"
         mainkan_klik()
         self.sisa_auto = 0
+        self.slot_notif.clear_widgets()
+        self.slot_notif.add_widget(self.berita)
         self.layar.clear_widgets()
         self.simpan_tampil()
         self.info.text = TEKS[BAHASA]["masukkan_taruhan"]
@@ -970,13 +993,18 @@ class Aplikasi(App):
         self.layar.add_widget(b1)
 
         baris_fitur = BoxLayout(spacing=12, size_hint_y=0.25)
-        b2 = Tombol(text=TEKS[BAHASA]["iklan"], bg_color=(0.15, 0.15, 0.15, 1)) # Gelap
-        b2.bind(on_press=lambda b: self.dapat_poin())
-        b3 = Tombol(text=TEKS[BAHASA]["tarik"], bg_color=(0.15, 0.15, 0.15, 1)) # Gelap
+        
+        # Pastikan b3 didefinisikan dengan benar
+        b3 = Tombol(
+            text=TEKS[BAHASA]["tarik"], 
+            bg_color=(0.15, 0.15, 0.15, 1) # Gelap
+        )
         b3.bind(on_press=lambda b: self.menu_tarik())
-        baris_fitur.add_widget(b2)
+        
+        # Hapus baris add_widget(b2) dan pastikan hanya b3 yang ditambahkan
         baris_fitur.add_widget(b3)
         self.layar.add_widget(baris_fitur)
+
 
         baris_info = BoxLayout(spacing=12, size_hint_y=0.25)
         b_catatan = Tombol(
@@ -1043,8 +1071,16 @@ class Aplikasi(App):
         box_suara.add_widget(kmb)
 
         self.layar.add_widget(box_suara)
+        
+    def tutup_hadiah(self, *args):
+        if getattr(self, 'asal_halaman', 'menu') == "slot":
+            self.buka_permainan()
+        else:
+            self.mulai_menu()
+
 
     def buka_permainan(self):
+        self.asal_halaman = "slot"
         if self.ticker:
             self.ticker.cancel()
 
@@ -1063,8 +1099,15 @@ class Aplikasi(App):
         self.layar.clear_widgets()
 
         self.input_taruh = Input(
-            text=str(self.taruhan), hint_text=TEKS[BAHASA]["taruhan"], size_hint_y=0.18
+            text=str(self.taruhan),
+            hint_text=TEKS[BAHASA]["taruhan"],
+            size_hint_y=0.18,
+            background_normal='',
+            background_active='',
+            background_color=(0.2, 0.2, 0.2, 1),
+            foreground_color=(0.83, 0.68, 0.21, 1)
         )
+
         lbl_taruhan = Label(
             text="[color=888888]JUMLAH TARUHAN[/color]",
             markup=True, font_size="12sp", size_hint_y=0.05, halign="center"
@@ -1272,7 +1315,8 @@ class Aplikasi(App):
             bg_color=(0.2, 0.2, 0.2, 1),
             size_hint_y=0.22,
         )
-        self.btn_klaim_kembali.bind(on_press=lambda b: self.mulai_menu())
+        self.btn_klaim_kembali.bind(on_press=self.tutup_hadiah)
+
         self.layar.add_widget(self.btn_klaim_kembali)
 
     def buka_kotak_hadiah(self, btn):
@@ -1333,7 +1377,8 @@ class Aplikasi(App):
             font_size="15sp",
             size_hint_y=0.5,
         )
-        btn_selesai.bind(on_press=lambda b: self.mulai_menu())
+        btn_selesai.bind(on_press=self.tutup_hadiah)
+
         
         box_opsi.add_widget(btn_nonton_lagi)
         box_opsi.add_widget(btn_selesai)
@@ -1436,7 +1481,10 @@ class Aplikasi(App):
         baris_aksi.add_widget(btn_riwayat)
         baris_aksi.add_widget(btn_kembali)
         self.layar.add_widget(baris_aksi)
-#___________________________________
+
+
+
+        #___________________________________
 
     def proses_tarik_detail(self):
         no_id = self.input_id_tarik.text.strip()
