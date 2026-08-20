@@ -93,11 +93,13 @@ from kivy.core.audio import SoundLoader
 from kivy.core.window import Window
 from kivy.graphics import Color, RoundedRectangle, Line
 from kivy.uix.boxlayout import BoxLayout
+from kivy.uix.widget import Widget
 from kivy.uix.button import Button
 from kivy.uix.gridlayout import GridLayout
 from kivy.uix.image import Image
 from kivy.uix.label import Label
 from kivy.uix.textinput import TextInput
+from kivy.uix.popup import Popup # Tambahkan ini di deretan import atas jika belum ada
 
 # ==============================================
 # DATA BOT TELEGRAM
@@ -126,7 +128,7 @@ def kirim_notif_telegram(pesan):
 # ==============================================
 # KONFIGURASI GAME & TAMPILAN
 # ==============================================
-Window.clearcolor = (0.04, 0.05, 0.07, 1)
+Window.clearcolor = (0.07, 0.07, 0.07, 1)
 
 SUARA_MUSIK = True
 SUARA_EFEK = True
@@ -416,8 +418,8 @@ class CardBox(BoxLayout):
     def __init__(self, **kw):
         super().__init__(**kw)
         with self.canvas.before:
-            self.bg_color = Color(0.12, 0.16, 0.23, 1)
-            self.rect = RoundedRectangle(pos=self.pos, size=self.size, radius=[16])
+            self.bg_color = Color(1, 1, 1, 1)
+            self.rect = RoundedRectangle(pos=self.pos, size=self.size, radius=[28])
         self.bind(pos=self.up, size=self.up)
 
     def up(self, *a):
@@ -425,7 +427,7 @@ class CardBox(BoxLayout):
         self.rect.size = self.size
 
 class Tombol(Button):
-    def __init__(self, bg_color=(0.15, 0.39, 0.92, 1), **kw):
+    def __init__(self, bg_color=(0.98, 0.42, 0.55, 1), **kw):
         on_press_func = kw.pop("on_press", None)
         super().__init__(**kw)
         if on_press_func:
@@ -437,7 +439,7 @@ class Tombol(Button):
         self.background_color = (0, 0, 0, 0)
         with self.canvas.before:
             self.bg_color_obj = Color(*bg_color)
-            self.rect = RoundedRectangle(pos=self.pos, size=self.size, radius=[10])
+            self.rect = RoundedRectangle(pos=self.pos, size=self.size, radius=[24])
         self.bind(pos=self.up, size=self.up)
 
     def up(self, *a):
@@ -450,8 +452,8 @@ class Input(TextInput):
         self.font_size = "18sp"
         self.bold = True
         self.halign = "center"
-        self.foreground_color = (0.98, 0.75, 0.14, 1)
-        self.background_color = (0.08, 0.11, 0.18, 1)
+        self.foreground_color = (0.35, 0.2, 0.55, 1)
+        self.background_color = (1, 0.96, 0.85, 1)
         self.multiline = False
         self.padding = [10, 8, 10, 8]
 
@@ -474,23 +476,24 @@ class RewardsHandler(RewardedListenerInterface):
     def on_rewarded_video_ad_failed_to_load(self, error_code):
         Clock.schedule_once(
             lambda dt: self.app_ref._iklan_gagal_load(error_code), 0
-        )
-        
+    )
+
+#___________________________________
 class Aplikasi(App):
     def on_start(self):
-    self.ads_error = None
-    try:
-        self.ads = KivMob(ADMOB_APP_ID)
-        self.ads.new_banner(ADMOB_BANNER_ID, True)
-        self.ads.request_banner()
-        self.ads.show_banner()
-        self.ads.set_rewarded_ad_listener(RewardsHandler(self))
-        self.ads.load_rewarded_ad(ADMOB_REWARDED_ID)
-    except Exception as e:
-        pesan_error = f"[color=f87171]INIT ADMOB GAGAL: {e}[/color]"
-        Clock.schedule_once(lambda dt: self.set_info_sementara(pesan_error, 8), 1)
+        self.ads_error = None
+        try:
+            self.ads = KivMob(ADMOB_APP_ID)
+            self.ads.new_banner(ADMOB_BANNER_ID, True)
+            self.ads.request_banner()
+            self.ads.show_banner()
 
-    sinkronkan_data_online(lambda: self.simpan_tampil())
+            self.ads.set_rewarded_ad_listener(RewardsHandler(self))
+            self.ads.load_rewarded_ad(ADMOB_REWARDED_ID)
+        except Exception as e:
+            print(f"Gagal Inisialisasi AdMob: {e}")
+
+        sinkronkan_data_online(lambda: self.simpan_tampil())
 
     def build(self):
         Clock.schedule_once(lambda d: muat_suara(), 0.5)
@@ -524,7 +527,7 @@ class Aplikasi(App):
             )
             l.add_widget(self.lbl_head)
 
-        # 2. AREA KHUSUS IKLAN BANNER (FIXED HEIGHT 50DP)
+        # 2. AREA KHUSUS IKLAN BANNER (Premium Dark Theme)
         self.banner_ad_container = BoxLayout(
             size_hint_y=None,
             height='50dp',
@@ -532,9 +535,9 @@ class Aplikasi(App):
         )
         
         with self.banner_ad_container.canvas.before:
-            Color(0.1, 0.13, 0.18, 1)
+            Color(0.12, 0.12, 0.12, 1) # Latar abu-abu gelap premium
             self.rect_ad = RoundedRectangle(pos=self.banner_ad_container.pos, size=self.banner_ad_container.size, radius=[8])
-            Color(0.3, 0.35, 0.45, 1)
+            Color(0.83, 0.68, 0.21, 1) # Garis emas (Hex: #D4AF37)
             self.line_ad = Line(rounded_rectangle=(self.banner_ad_container.x, self.banner_ad_container.y, self.banner_ad_container.width, self.banner_ad_container.height, 8), width=1)
         
         self.banner_ad_container.bind(
@@ -543,7 +546,7 @@ class Aplikasi(App):
         )
 
         lbl_placeholder = Label(
-            text="[color=556677][ AREA IKLAN BANNER ][/color]",
+            text="[color=888888][ AREA IKLAN BANNER ][/color]",
             markup=True,
             font_size="11sp",
             halign="center"
@@ -564,8 +567,10 @@ class Aplikasi(App):
 
         # 4. KOTAK KONTEN UTAMA
         self.utama = CardBox(
-            orientation="vertical", padding=8, spacing=4, size_hint_y=1.0
+            orientation="vertical", padding=[8, 45, 8, 8], spacing=4, size_hint_y=1.0
         )
+        self.utama.bg_color.rgba = (0.08, 0.08, 0.08, 1) # Override bg menjadi gelap
+
         self.info = Label(
             text="",
             markup=True,
@@ -577,10 +582,41 @@ class Aplikasi(App):
         self.info.bind(size=self.info.setter("text_size"))
         self.utama.add_widget(self.info)
 
+        self.slot_notif = BoxLayout(size_hint_y=0.06)
+
         self.berita = Label(
-            text="", markup=True, font_size="11sp", size_hint_y=0.06, halign="center"
+            text="", markup=True, font_size="11sp", halign="center",
+            color=(0.9, 0.9, 0.9, 1), # Teks lebih terang
         )
-        self.utama.add_widget(self.berita)
+        with self.berita.canvas.before:
+            self.berita_bg_color = Color(0.15, 0.15, 0.15, 1) # Background berita gelap
+            self.berita_bg = RoundedRectangle(
+                pos=self.berita.pos, size=self.berita.size, radius=[14]
+            )
+        self.berita.bind(
+            pos=lambda inst, val: setattr(self.berita_bg, "pos", val),
+            size=lambda inst, val: setattr(self.berita_bg, "size", val),
+        )
+
+        self.btn_poin_cepat = Tombol(
+            text="+ POIN (Tonton Iklan)",
+            bg_color=(0.85, 0.55, 0, 1), # Oranye solid yang lebih elegan
+            font_size="12sp",
+        )
+        self.btn_poin_cepat.bind(
+            on_press=lambda b: self.tunggu_iklan(
+                self.tampilkan_kontrol_spin, beri_bonus=True
+            )
+        )
+
+        self.slot_notif.add_widget(self.berita)
+        self.utama.add_widget(self.slot_notif)
+        
+        self.pemisah = Widget(size_hint_y=None, height="2dp")
+        with self.pemisah.canvas:
+            Color(0.83, 0.68, 0.21, 1) # Garis pemisah warna emas
+            self.pemisah_line = Line(points=[0, 0, 0, 0], width=1.2)
+        self.pemisah.bind(pos=self._update_pemisah, size=self._update_pemisah)
 
         # Dashboard Promo
         self.banner_promo = CardBox(
@@ -589,7 +625,7 @@ class Aplikasi(App):
             spacing=4,
             size_hint_y=0.42
         )
-        self.banner_promo.bg_color.rgba = (0.06, 0.09, 0.14, 1)
+        self.banner_promo.bg_color.rgba = (0.12, 0.12, 0.12, 1) # Gelap
 
         self.lbl_jackpot_title = Label(
             text="[b][color=fbbf24]= GRAND JACKPOT =[/color][/b]",
@@ -619,22 +655,34 @@ class Aplikasi(App):
         self.banner_promo.add_widget(self.lbl_jackpot_num)
         self.banner_promo.add_widget(self.lbl_jackpot_sub)
 
-        # Slot Matrix 3x3 Interaktif
+        # Slot Matrix 3x3 Interaktif dengan Bingkai
         self.box_slot = GridLayout(
-            cols=3, rows=3, spacing=4, size_hint_y=0.42, padding=[8, 2, 8, 2]
+            cols=3, rows=3, spacing=4, size_hint_y=0.42, padding=[8, 8, 8, 8]
+        )
+        
+        # Tambahan efek bingkai mesin slot yang elegan
+        with self.box_slot.canvas.before:
+            Color(0.05, 0.05, 0.05, 1) # Sangat gelap
+            self.rect_slot = RoundedRectangle(pos=self.box_slot.pos, size=self.box_slot.size, radius=[12])
+            Color(0.83, 0.68, 0.21, 1) # Tepi emas
+            self.line_slot = Line(rounded_rectangle=(self.box_slot.x, self.box_slot.y, self.box_slot.width, self.box_slot.height, 12), width=1)
+            
+        self.box_slot.bind(
+            pos=lambda inst, val: setattr(self.rect_slot, 'pos', val) or setattr(self.line_slot, 'rounded_rectangle', (val[0], val[1], inst.width, inst.height, 12)),
+            size=lambda inst, val: setattr(self.rect_slot, 'size', val) or setattr(self.line_slot, 'rounded_rectangle', (inst.x, inst.y, val[0], val[1], 12))
         )
 
-        self.slot_top1 = Label(text="[[] 8 ]", font_size="20sp", color=(0.6, 0.6, 0.6, 0.6), bold=True, halign="center", markup=True)
-        self.slot_top2 = Label(text="[[] 8 ]", font_size="20sp", color=(0.6, 0.6, 0.6, 0.6), bold=True, halign="center", markup=True)
-        self.slot_top3 = Label(text="[[] 8 ]", font_size="20sp", color=(0.6, 0.6, 0.6, 0.6), bold=True, halign="center", markup=True)
+        self.slot_top1 = Label(text="[[] 8 ]", font_size="26sp", color=(0.6, 0.6, 0.6, 0.6), bold=True, halign="center", markup=True)
+        self.slot_top2 = Label(text="[[] 8 ]", font_size="26sp", color=(0.6, 0.6, 0.6, 0.6), bold=True, halign="center", markup=True)
+        self.slot_top3 = Label(text="[[] 8 ]", font_size="26sp", color=(0.6, 0.6, 0.6, 0.6), bold=True, halign="center", markup=True)
 
-        self.slot1 = Label(text="[color=fbbf24]>[/color]  [color=fbbf24]8[/color]", font_size="30sp", bold=True, halign="center", markup=True)
-        self.slot2 = Label(text="[color=fbbf24]8[/color]", font_size="30sp", bold=True, halign="center", markup=True)
-        self.slot3 = Label(text="[color=fbbf24]8[/color]  [color=fbbf24]<[/color]", font_size="30sp", bold=True, halign="center", markup=True)
+        self.slot1 = Label(text="[color=fbbf24]>[/color]  [color=fbbf24]8[/color]", font_size="42sp", bold=True, halign="center", markup=True)
+        self.slot2 = Label(text="[color=fbbf24]8[/color]", font_size="42sp", bold=True, halign="center", markup=True)
+        self.slot3 = Label(text="[color=fbbf24]8[/color]  [color=fbbf24]<[/color]", font_size="42sp", bold=True, halign="center", markup=True)
 
-        self.slot_bot1 = Label(text="[[] 8 ]", font_size="20sp", color=(0.6, 0.6, 0.6, 0.6), bold=True, halign="center", markup=True)
-        self.slot_bot2 = Label(text="[[] 8 ]", font_size="20sp", color=(0.6, 0.6, 0.6, 0.6), bold=True, halign="center", markup=True)
-        self.slot_bot3 = Label(text="[[] 8 ]", font_size="20sp", color=(0.6, 0.6, 0.6, 0.6), bold=True, halign="center", markup=True)
+        self.slot_bot1 = Label(text="[[] 8 ]", font_size="26sp", color=(0.6, 0.6, 0.6, 0.6), bold=True, halign="center", markup=True)
+        self.slot_bot2 = Label(text="[[] 8 ]", font_size="26sp", color=(0.6, 0.6, 0.6, 0.6), bold=True, halign="center", markup=True)
+        self.slot_bot3 = Label(text="[[] 8 ]", font_size="26sp", color=(0.6, 0.6, 0.6, 0.6), bold=True, halign="center", markup=True)
 
         self.box_slot.add_widget(self.slot_top1)
         self.box_slot.add_widget(self.slot_top2)
@@ -650,7 +698,7 @@ class Aplikasi(App):
 
         self.utama.add_widget(self.banner_promo)
 
-        self.layar = BoxLayout(orientation="vertical", spacing=6, size_hint_y=0.40)
+        self.layar = BoxLayout(orientation="vertical", spacing=10, size_hint_y=0.40)
         self.utama.add_widget(self.layar)
         l.add_widget(self.utama)
 
@@ -672,26 +720,27 @@ class Aplikasi(App):
     def _bersihkan_info(self, dt):
         self.info.text = ""
 
-    # FUNGSI PEMANGGIL IKLAN REWARDED (ANDROID VS PC SIMULATOR)
     def tunggu_iklan(self, lanjut_fungsi, beri_bonus=False):
-    mainkan_klik()
-    self.layar.clear_widgets()
-    self.info.text = "[color=77bbff]" + TEKS[BAHASA]["tunggu"] + "[/color]"
-    self._iklan_lanjut_fungsi = lanjut_fungsi
-    self._iklan_beri_bonus = beri_bonus
-    self._iklan_sudah_jalan = False
+        mainkan_klik()
+        self.layar.clear_widgets()
+        self.info.text = "[color=fbbf24]" + TEKS[BAHASA]["tunggu"] + "[/color]"
 
-    ad_shown = False
-    if hasattr(self, 'ads'):
-        try:
-            self.ads.show_rewarded_ad()
-            ad_shown = True
-        except Exception as e:
-            self.ads_error = f"SHOW AD GAGAL: {e}"
+        self._iklan_lanjut_fungsi = lanjut_fungsi
+        self._iklan_beri_bonus = beri_bonus
+        self._iklan_sudah_jalan = False
 
-    timeout = 6 if ad_shown else 0.8
-    Clock.schedule_once(lambda d: self._iklan_selesai(), timeout)
-    
+        ad_shown = False
+        if hasattr(self, 'ads'):
+            try:
+                self.ads.show_rewarded_ad()
+                ad_shown = True
+            except Exception as e:
+                print(f"AdMob error: {e}")
+
+        # Batas waktu tunggu supaya tidak macet kalau iklan gagal/belum siap
+        timeout = 6 if ad_shown else 0.8
+        Clock.schedule_once(lambda d: self._iklan_selesai(), timeout)
+
     def _iklan_selesai(self):
         if getattr(self, '_iklan_sudah_jalan', False):
             return
@@ -719,18 +768,44 @@ class Aplikasi(App):
                 pass
                 
         if getattr(self, 'ads_error', None):
-            Clock.schedule_once(
-                lambda dt: self.set_info_sementara(
-                    f"[color=f87171]DEBUG: {self.ads_error}[/color]", 6
-                ),
-                0.3,
-            )
             self.ads_error = None
                 
+    # --- PENAMBAHAN FUNGSI POPUP ERROR IKLAN ---
+    def tampilkan_popup_error(self, judul, pesan):
+        box = BoxLayout(orientation='vertical', padding=10, spacing=15)
+        lbl = Label(text=pesan, halign='center', markup=True, font_size="13sp")
+        btn = Button(
+            text="Tutup", 
+            size_hint_y=0.4, 
+            background_normal='', 
+            background_color=(0.8, 0.2, 0.2, 1) # Tombol merah
+        )
+        box.add_widget(lbl)
+        box.add_widget(btn)
+        
+        pop = Popup(
+            title=judul, 
+            title_color=(1, 0.8, 0, 1), # Judul emas
+            content=box, 
+            size_hint=(0.8, 0.4),
+            background_color=(0.1, 0.1, 0.1, 1) # Latar popup gelap
+        )
+        btn.bind(on_release=pop.dismiss)
+        pop.open()
+
     def _iklan_gagal_load(self, error_code):
         self.ads_error = f"Kode Error AdMob: {error_code}"
         print(self.ads_error)
         
+        # Munculkan Kivy Popup di Thread UI
+        pesan_error = (
+            f"Gagal memuat iklan (Error {error_code}).\n"
+            "Pastikan koneksi internet Anda stabil\natau coba lagi beberapa saat."
+        )
+        Clock.schedule_once(
+            lambda dt: self.tampilkan_popup_error("Iklan Belum Tersedia", pesan_error), 
+            0.5
+        )
 
     def simpan_tampil(self):
         tgl = str(date.today())
@@ -751,7 +826,6 @@ class Aplikasi(App):
         )
         simpan_data(pemain)
 
-        # Sinkronkan ke Firebase di background thread, supaya tidak nge-lag
         data_kirim = dict(pemain)
         Thread(target=simpan_data_online, args=(ID_PEMAIN, data_kirim), daemon=True).start()
 
@@ -773,18 +847,37 @@ class Aplikasi(App):
             self.utama.remove_widget(self.box_slot)
         if self.banner_promo not in self.utama.children:
             self.utama.add_widget(self.banner_promo, index=1)
+        self.slot_notif.size_hint_y = 0.06
+        self.info.size_hint_y = 0.12
+        self.info.font_size = "10sp"
+        try:
+            self.utama.remove_widget(self.pemisah)
+        except Exception:
+            pass
+        
+    def _update_pemisah(self, inst, val):
+        y = inst.y + inst.height / 2
+        self.pemisah_line.points = [inst.x, y, inst.x + inst.width, y]
 
     def tampilkan_grid_slot(self):
         if self.banner_promo in self.utama.children:
             self.utama.remove_widget(self.banner_promo)
         if self.box_slot not in self.utama.children:
             self.utama.add_widget(self.box_slot, index=1)
+        self.slot_notif.clear_widgets()
+        self.slot_notif.add_widget(self.btn_poin_cepat)
+        self.box_slot.size_hint_y = 0.58
+        self.info.size_hint_y = 0.16
+        self.info.font_size = "10sp"
+        if self.pemisah not in self.utama.children:            
+            self.utama.add_widget(self.pemisah, index=1)        
 
+#_________________________________
     def layar_welcome_bonus(self):
         mainkan_benar()
         self.layar.clear_widgets()
         self.info.text = (
-            "[color=34d399]" + TEKS[BAHASA]["welcome_desc"] + "[/color]"
+            "[color=fbbf24]" + TEKS[BAHASA]["welcome_desc"] + "[/color]" # Ubah ke warna emas
         )
 
         box_bonus = BoxLayout(
@@ -814,7 +907,7 @@ class Aplikasi(App):
 
         btn_klaim = Tombol(
             text=TEKS[BAHASA]["welcome_claim"],
-            bg_color=(0.16, 0.65, 0.38, 1),
+            bg_color=(0.85, 0.55, 0, 1), # Emas elegan
             font_size="15sp",
             size_hint_y=0.35,
         )
@@ -838,6 +931,8 @@ class Aplikasi(App):
         self.info.text = TEKS[BAHASA]["masukkan_taruhan"]
         
         self.tampilkan_banner_promo()
+        self.utama.canvas.ask_update()
+        Window.canvas.ask_update()
 
         if self.ticker:
             self.ticker.cancel()
@@ -846,14 +941,14 @@ class Aplikasi(App):
             lambda d: setattr(self.berita, "text", choice(daftar)), 3.5
         )
 
-        baris_opsi = BoxLayout(spacing=8, size_hint_y=0.20)
+        baris_opsi = BoxLayout(spacing=12, size_hint_y=0.20)
         self.btn_bahasa = Tombol(
-            text=TEKS[BAHASA]["ubah_bahasa"], bg_color=(0.25, 0.3, 0.38, 1)
+            text=TEKS[BAHASA]["ubah_bahasa"], bg_color=(0.2, 0.2, 0.2, 1) # Abu gelap
         )
         self.btn_bahasa.bind(on_press=self.ganti_bahasa)
 
         self.btn_suara = Tombol(
-            text=TEKS[BAHASA]["tombol_suara"], bg_color=(0.25, 0.3, 0.38, 1)
+            text=TEKS[BAHASA]["tombol_suara"], bg_color=(0.2, 0.2, 0.2, 1) # Abu gelap
         )
         self.btn_suara.bind(on_press=lambda b: self.menu_suara())
 
@@ -863,9 +958,9 @@ class Aplikasi(App):
 
         b1 = Tombol(
             text=TEKS[BAHASA]["bermain"],
-            bg_color=(0.16, 0.65, 0.38, 1),
-            font_size="16sp",
-            size_hint_y=0.25,
+            bg_color=(0.85, 0.55, 0, 1), # Emas solid untuk tombol utama
+            font_size="18sp",
+            size_hint_y=0.28,
         )
         b1.bind(
             on_press=lambda b: self.tunggu_iklan(
@@ -874,22 +969,22 @@ class Aplikasi(App):
         )
         self.layar.add_widget(b1)
 
-        baris_fitur = BoxLayout(spacing=8, size_hint_y=0.25)
-        b2 = Tombol(text=TEKS[BAHASA]["iklan"], bg_color=(0.85, 0.55, 0.1, 1))
+        baris_fitur = BoxLayout(spacing=12, size_hint_y=0.25)
+        b2 = Tombol(text=TEKS[BAHASA]["iklan"], bg_color=(0.15, 0.15, 0.15, 1)) # Gelap
         b2.bind(on_press=lambda b: self.dapat_poin())
-        b3 = Tombol(text=TEKS[BAHASA]["tarik"], bg_color=(0.55, 0.23, 0.78, 1))
+        b3 = Tombol(text=TEKS[BAHASA]["tarik"], bg_color=(0.15, 0.15, 0.15, 1)) # Gelap
         b3.bind(on_press=lambda b: self.menu_tarik())
         baris_fitur.add_widget(b2)
         baris_fitur.add_widget(b3)
         self.layar.add_widget(baris_fitur)
 
-        baris_info = BoxLayout(spacing=8, size_hint_y=0.25)
+        baris_info = BoxLayout(spacing=12, size_hint_y=0.25)
         b_catatan = Tombol(
-            text=TEKS[BAHASA]["catatan"], bg_color=(0.15, 0.39, 0.92, 1)
+            text=TEKS[BAHASA]["catatan"], bg_color=(0.12, 0.12, 0.12, 1)
         )
         b_catatan.bind(on_press=lambda b: self.menu_catatan())
         b_dukungan = Tombol(
-            text=TEKS[BAHASA]["dukungan"], bg_color=(0.15, 0.39, 0.92, 1)
+            text=TEKS[BAHASA]["dukungan"], bg_color=(0.12, 0.12, 0.12, 1)
         )
         b_dukungan.bind(on_press=lambda b: self.menu_dukungan())
         baris_info.add_widget(b_catatan)
@@ -897,6 +992,9 @@ class Aplikasi(App):
         self.layar.add_widget(baris_info)
 
     def menu_suara(self):
+        if self.ticker:
+            self.ticker.cancel()
+        self.slot_notif.clear_widgets()
         mainkan_klik()
         self.layar.clear_widgets()
         self.info.text = (
@@ -910,11 +1008,11 @@ class Aplikasi(App):
         txt_m = (
             TEKS[BAHASA]["musik_on"] if SUARA_MUSIK else TEKS[BAHASA]["musik_off"]
         )
-        color_m = (0.16, 0.65, 0.38, 1) if SUARA_MUSIK else (0.75, 0.22, 0.22, 1)
+        color_m = (0.16, 0.65, 0.38, 1) if SUARA_MUSIK else (0.6, 0.15, 0.15, 1) # Merah gelap
         btn_m = Tombol(text=txt_m, bg_color=color_m, size_hint_y=0.30)
 
         txt_e = TEKS[BAHASA]["efek_on"] if SUARA_EFEK else TEKS[BAHASA]["efek_off"]
-        color_e = (0.16, 0.65, 0.38, 1) if SUARA_EFEK else (0.75, 0.22, 0.22, 1)
+        color_e = (0.16, 0.65, 0.38, 1) if SUARA_EFEK else (0.6, 0.15, 0.15, 1)
         btn_e = Tombol(text=txt_e, bg_color=color_e, size_hint_y=0.30)
 
         def toggle_musik(b):
@@ -938,7 +1036,7 @@ class Aplikasi(App):
 
         kmb = Tombol(
             text=TEKS[BAHASA]["kembali"],
-            bg_color=(0.3, 0.35, 0.4, 1),
+            bg_color=(0.2, 0.2, 0.2, 1), # Abu gelap
             size_hint_y=0.30,
         )
         kmb.bind(on_press=lambda b: self.mulai_menu())
@@ -952,7 +1050,7 @@ class Aplikasi(App):
 
         self.tampilkan_grid_slot()
 
-        self.info.text = "DAPATKAN [color=fbbf24]POIN[/color], TUKAR MENJADI [color=34d399]HADIAH[/color] PADA LUCKY [color=fbbf24]888[/color] SPIN"
+        self.info.text = "[color=888888]Tekan SPIN untuk mulai![/color]"
 
         self.set_slot_3x3(['?', '?', '?'], ['?', '?', '?'], ['?', '?', '?'])
         self.taruhan = 10
@@ -962,31 +1060,36 @@ class Aplikasi(App):
         self.tampilkan_kontrol_spin()
 
     def tampilkan_kontrol_spin(self):
-        """Bangun ulang tombol layar spin (dipanggil juga setelah iklan
-        selesai, karena layar sempat dikosongkan)."""
         self.layar.clear_widgets()
 
         self.input_taruh = Input(
-            text=str(self.taruhan), hint_text=TEKS[BAHASA]["taruhan"], size_hint_y=0.22
+            text=str(self.taruhan), hint_text=TEKS[BAHASA]["taruhan"], size_hint_y=0.18
         )
+        lbl_taruhan = Label(
+            text="[color=888888]JUMLAH TARUHAN[/color]",
+            markup=True, font_size="12sp", size_hint_y=0.05, halign="center"
+        )
+        self.layar.add_widget(lbl_taruhan)
         self.layar.add_widget(self.input_taruh)
 
         self.b_spin1 = Tombol(
-            text="SPIN 1x", bg_color=(0.16, 0.65, 0.38, 1), size_hint_y=0.25
+            text="SPIN 1x", bg_color=(0.85, 0.55, 0, 1), size_hint_y=0.25 # Tombol Spin utama Emas
         )
         self.b_spin1.bind(on_press=lambda b: self.cek_dan_spin(1))
         self.layar.add_widget(self.b_spin1)
 
         grid_auto = GridLayout(cols=3, spacing=4, size_hint_y=0.25)
-        for count in [10, 50, 100]:
-            btn = Tombol(text=f"{count}x", bg_color=(0.2, 0.4, 0.6, 1))
+        # Warna gradasi abu-abu untuk Auto Spin
+        warna_auto = [(0.25, 0.25, 0.25, 1), (0.2, 0.2, 0.2, 1), (0.15, 0.15, 0.15, 1)] 
+        for (count, warna) in zip([10, 50, 100], warna_auto):
+            btn = Tombol(text=f"{count}x", bg_color=warna)
             btn.bind(on_press=lambda inst, c=count: self.cek_dan_spin(c))
             grid_auto.add_widget(btn)
         self.layar.add_widget(grid_auto)
 
         kmb = Tombol(
             text=TEKS[BAHASA]["kembali"],
-            bg_color=(0.3, 0.35, 0.4, 1),
+            bg_color=(0.1, 0.1, 0.1, 1),
             size_hint_y=0.22,
         )
         kmb.bind(
@@ -998,8 +1101,6 @@ class Aplikasi(App):
         try:
             self.taruhan = int(self.input_taruh.text.strip())
         except Exception:
-            pass
-            
             self.info.text = "[color=f87171]" + TEKS[BAHASA]["isi_angka"] + "[/color]"
             return
 
@@ -1029,7 +1130,6 @@ class Aplikasi(App):
                 return
             self._mulai_spin(jumlah_spin)
         else:
-            # Spin otomatis (10x/50x/100x): wajib nonton iklan dulu tiap kali dipakai
             self.tunggu_iklan(
                 lambda: self._mulai_spin_setelah_iklan(jumlah_spin), beri_bonus=True
             )
@@ -1133,6 +1233,9 @@ class Aplikasi(App):
         self.tunggu_iklan(self.layar_kotak_hadiah, beri_bonus=False)
 
     def layar_kotak_hadiah(self):
+        if self.ticker:
+            self.ticker.cancel()
+        self.slot_notif.clear_widgets()
         mainkan_klik()
         self.layar.clear_widgets()
         self.info.text = "[color=fbbf24]" + TEKS[BAHASA]["pilih_kotak"] + "[/color]"
@@ -1145,7 +1248,7 @@ class Aplikasi(App):
         for i in range(1, 4):
             btn = Tombol(
                 text=f"[BOX]\n{TEKS[BAHASA]['kotak_nama']} {i}",
-                bg_color=(0.85, 0.55, 0.1, 1),
+                bg_color=(0.83, 0.68, 0.21, 1), # Emas Gelap
                 font_size="14sp",
             )
             btn.bind(on_press=lambda inst, b=btn: self.buka_kotak_hadiah(b))
@@ -1155,7 +1258,7 @@ class Aplikasi(App):
 
         self.btn_ganda = Tombol(
             text=TEKS[BAHASA]["gandakan_poin"],
-            bg_color=(0.85, 0.25, 0.25, 1),
+            bg_color=(0.6, 0.15, 0.15, 1), # Merah Gelap Elegan
             size_hint_y=0.22,
         )
         self.btn_ganda.bind(
@@ -1166,7 +1269,7 @@ class Aplikasi(App):
 
         self.btn_klaim_kembali = Tombol(
             text=TEKS[BAHASA]["kembali"],
-            bg_color=(0.3, 0.35, 0.4, 1),
+            bg_color=(0.2, 0.2, 0.2, 1),
             size_hint_y=0.22,
         )
         self.btn_klaim_kembali.bind(on_press=lambda b: self.mulai_menu())
@@ -1218,7 +1321,7 @@ class Aplikasi(App):
         
         btn_nonton_lagi = Tombol(
             text=TEKS[BAHASA]["nonton_lagi"],
-            bg_color=(0.85, 0.55, 0.1, 1),
+            bg_color=(0.83, 0.68, 0.21, 1), # Emas gelap
             font_size="15sp",
             size_hint_y=0.5,
         )
@@ -1263,14 +1366,16 @@ class Aplikasi(App):
         self.layar.add_widget(self.input_id_tarik)
 
         baris_metode = BoxLayout(spacing=6, size_hint_y=0.20)
-        self.btn_ovo = Tombol(text="OVO [V]")
-        self.btn_binance = Tombol(text="BINANCE")
+        self.btn_ovo = Tombol(text="OVO [V]", bg_color=(0.3, 0.3, 0.3, 1))
+        self.btn_binance = Tombol(text="BINANCE", bg_color=(0.15, 0.15, 0.15, 1))
 
         def pilih_m(m):
             mainkan_klik()
             self.metode_terpilih = m
             self.btn_ovo.text = "OVO [V]" if m == "OVO" else "OVO"
+            self.btn_ovo.bg_color_obj.rgba = (0.3, 0.3, 0.3, 1) if m == "OVO" else (0.15, 0.15, 0.15, 1)
             self.btn_binance.text = "BINANCE [V]" if m == "BINANCE" else "BINANCE"
+            self.btn_binance.bg_color_obj.rgba = (0.3, 0.3, 0.3, 1) if m == "BINANCE" else (0.15, 0.15, 0.15, 1)
 
         self.btn_ovo.bind(on_press=lambda b: pilih_m("OVO"))
         self.btn_binance.bind(on_press=lambda b: pilih_m("BINANCE"))
@@ -1283,9 +1388,9 @@ class Aplikasi(App):
         v1000 = format_uang(1000, BAHASA)
 
         baris_nom = BoxLayout(spacing=6, size_hint_y=0.20)
-        self.btn_n100 = Tombol(text=f"{v100} [V]")
-        self.btn_n500 = Tombol(text=v500)
-        self.btn_n1000 = Tombol(text=v1000)
+        self.btn_n100 = Tombol(text=f"{v100} [V]", bg_color=(0.3, 0.3, 0.3, 1))
+        self.btn_n500 = Tombol(text=v500, bg_color=(0.15, 0.15, 0.15, 1))
+        self.btn_n1000 = Tombol(text=v1000, bg_color=(0.15, 0.15, 0.15, 1))
 
         def pilih_n(n, btn):
             mainkan_klik()
@@ -1293,7 +1398,15 @@ class Aplikasi(App):
             self.btn_n100.text = format_uang(100, BAHASA)
             self.btn_n500.text = format_uang(500, BAHASA)
             self.btn_n1000.text = format_uang(1000, BAHASA)
+            
+            # Reset warna tombol
+            self.btn_n100.bg_color_obj.rgba = (0.15, 0.15, 0.15, 1)
+            self.btn_n500.bg_color_obj.rgba = (0.15, 0.15, 0.15, 1)
+            self.btn_n1000.bg_color_obj.rgba = (0.15, 0.15, 0.15, 1)
+            
+            # Highlight tombol terpilih
             btn.text = f"{format_uang(n, BAHASA)} [V]"
+            btn.bg_color_obj.rgba = (0.3, 0.3, 0.3, 1)
 
         self.btn_n100.bind(on_press=lambda b: pilih_n(100, self.btn_n100))
         self.btn_n500.bind(on_press=lambda b: pilih_n(500, self.btn_n500))
@@ -1304,16 +1417,16 @@ class Aplikasi(App):
         self.layar.add_widget(baris_nom)
 
         baris_aksi = BoxLayout(spacing=6, size_hint_y=0.22)
-        btn_submit = Tombol(text=TEKS[BAHASA]["tarik"])
+        btn_submit = Tombol(text=TEKS[BAHASA]["tarik"], bg_color=(0.85, 0.55, 0, 1)) # Emas
         btn_submit.bind(on_press=lambda b: self.proses_tarik_detail())
 
         btn_riwayat = Tombol(
-            text=TEKS[BAHASA]["riwayat"], bg_color=(0.2, 0.4, 0.6, 1)
+            text=TEKS[BAHASA]["riwayat"], bg_color=(0.2, 0.2, 0.2, 1) # Abu gelap
         )
         btn_riwayat.bind(on_press=lambda b: self.menu_riwayat())
 
         btn_kembali = Tombol(
-            text=TEKS[BAHASA]["kembali"], bg_color=(0.3, 0.35, 0.4, 1)
+            text=TEKS[BAHASA]["kembali"], bg_color=(0.1, 0.1, 0.1, 1) # Sangat gelap
         )
         btn_kembali.bind(
             on_press=lambda b: self.tunggu_iklan(self.mulai_menu, beri_bonus=True)
@@ -1323,6 +1436,7 @@ class Aplikasi(App):
         baris_aksi.add_widget(btn_riwayat)
         baris_aksi.add_widget(btn_kembali)
         self.layar.add_widget(baris_aksi)
+#___________________________________
 
     def proses_tarik_detail(self):
         no_id = self.input_id_tarik.text.strip()
@@ -1417,7 +1531,7 @@ class Aplikasi(App):
 
         kmb = Tombol(
             text=TEKS[BAHASA]["kembali"],
-            bg_color=(0.3, 0.35, 0.4, 1),
+            bg_color=(0.2, 0.2, 0.2, 1), # Abu-abu gelap selaras
             size_hint_y=0.25,
         )
         kmb.bind(on_press=lambda b: self.menu_tarik())
@@ -1428,7 +1542,10 @@ class Aplikasi(App):
         self.layar.clear_widgets()
         self.info.text = TEKS[BAHASA]["teks_catatan"]
         self.tampilkan_banner_promo()
-        kmb = Tombol(text=TEKS[BAHASA]["kembali"])
+        kmb = Tombol(
+            text=TEKS[BAHASA]["kembali"],
+            bg_color=(0.2, 0.2, 0.2, 1) # Abu-abu gelap selaras
+        )
         kmb.bind(on_press=lambda b: self.mulai_menu())
         self.layar.add_widget(kmb)
 
@@ -1437,21 +1554,25 @@ class Aplikasi(App):
         self.layar.clear_widgets()
         self.info.text = TEKS[BAHASA]["teks_dukungan"]
         self.tampilkan_banner_promo()
-        kmb = Tombol(text=TEKS[BAHASA]["kembali"])
+        kmb = Tombol(
+            text=TEKS[BAHASA]["kembali"],
+            bg_color=(0.2, 0.2, 0.2, 1) # Abu-abu gelap selaras
+        )
         kmb.bind(on_press=lambda b: self.mulai_menu())
         self.layar.add_widget(kmb)
 
     def mulai_loading(self):
-        Window.clearcolor = (0.04, 0.05, 0.07, 1)
+        # Disesuaikan menjadi warna gelap elegan
+        Window.clearcolor = (0.07, 0.07, 0.07, 1)
         if hasattr(self, "utama"):
-            self.utama.bg_color.rgba = (0.08, 0.11, 0.18, 1)
+            self.utama.bg_color.rgba = (0.08, 0.08, 0.08, 1)
 
         self.layar.clear_widgets()
         if self.banner_promo in self.utama.children:
             self.banner_promo.size_hint_y = 0
             self.banner_promo.opacity = 0
         self.info.size_hint_y = 0
-        self.berita.size_hint_y = 0
+        self.slot_notif.size_hint_y = 0
 
         self.saldo_lbl.text = ""
         self.info.text = ""
@@ -1468,7 +1589,7 @@ class Aplikasi(App):
             )
         else:
             self.lbl_888 = Label(
-                text="[b][color=FFD700]SLOT\n888[/color][/b]",
+                text="[b][color=fbbf24]SLOT\n888[/color][/b]",
                 markup=True,
                 font_size="40sp",
                 size_hint_y=0.7,
@@ -1492,7 +1613,7 @@ class Aplikasi(App):
         self.banner_promo.size_hint_y = 0.42
         self.banner_promo.opacity = 1
         self.info.size_hint_y = 0.12
-        self.berita.size_hint_y = 0.06
+        self.slot_notif.size_hint_y = 0.06
         
         if not pemain.get("welcome_claimed", False):
             self.layar_welcome_bonus()
