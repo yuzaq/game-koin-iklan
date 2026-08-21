@@ -82,10 +82,15 @@ ADMOB_REWARDED_ID = "ca-app-pub-3940256099942544/5224354917"  # Test Rewarded ID
 # ==============================================
 from jnius import autoclass, cast, PythonJavaClass, java_method
 
-PythonActivity = autoclass('org.kivy.android.PythonActivity')
-MobileAds = autoclass('com.google.android.gms.ads.MobileAds')
-AdRequestBuilder = autoclass('com.google.android.gms.ads.AdRequest$Builder')
-RewardedAd = autoclass('com.google.android.gms.ads.rewarded.RewardedAd')
+try:
+    PythonActivity = autoclass('org.kivy.android.PythonActivity')
+    MobileAds = autoclass('com.google.android.gms.ads.MobileAds')
+    AdRequestBuilder = autoclass('com.google.android.gms.ads.AdRequest$Builder')
+    RewardedAd = autoclass('com.google.android.gms.ads.rewarded.RewardedAd')
+    PYJNIUS_ADS_OK = True
+except Exception as e:
+    print(f"GAGAL LOAD KELAS ADMOB: {e}")
+    PYJNIUS_ADS_OK = False
 
 _rewarded_ad_instance = [None]  # simpan iklan yang sudah dimuat, di list biar bisa diubah dari dalam fungsi lain
 _ads_initialized = [False]
