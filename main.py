@@ -550,6 +550,33 @@ class RewardsHandler(RewardedListenerInterface):
             lambda dt: self.app_ref._iklan_gagal_load(error_code), 0
         )
 
+
+class RewardedAdLoadCallback(JavaProxy):
+    def __init__(self, callback_sukses):
+        super(RewardedAdLoadCallback, self).__init__('com/google/android/gms/ads/rewarded/RewardedAdLoadCallback')
+        self.callback_sukses = callback_sukses
+        self.on_gagal = None
+
+    def onAdLoaded(self, rewardedAd):
+        print("DEBUG: Iklan Rewarded Berhasil Dimuat!")
+        _rewarded_ad_instance[0] = rewardedAd
+        self.callback_sukses(rewardedAd)
+
+    def onAdFailedToLoad(self, loadAdError):
+        pesan = f"Gagal Memuat Iklan: {loadAdError.getMessage()}"
+        print(pesan)
+        if self.on_gagal:
+            self.on_gagal(pesan)
+
+
+class OnUserEarnedRewardListener(JavaProxy):
+    def __init__(self, reward_callback):
+        super(OnUserEarnedRewardListener, self).__init__('com/google/android/gms/ads/OnUserEarnedRewardListener')
+        self.reward_callback = reward_callback
+
+    def onUserEarnedReward(self, rewardItem):
+        print("DEBUG: Pengguna menonton sampai selesai, berikan reward!")
+        self.reward_callback()
 #__________________________________
 class Aplikasi(App):
     def on_start(self):
@@ -858,12 +885,12 @@ class Aplikasi(App):
         self._iklan_sudah_jalan = False
 
         ad_shown = False
-        if hasattr(self, 'ads'):
-            try:
-                self.ads.show_rewarded_ad()
-                ad_shown = True
-            except Exception as e:
-                print(f"AdMob error: {e}")
+        try:
+            ad_shown = tampilkan_iklan_rewarded(
+                callback_dapat_reward=lambda: None
+            )
+        except Exception as e:
+            print(f"AdMob error: {e}")
 
         # Batas waktu tunggu supaya tidak macet kalau iklan gagal/belum siap
         timeout = 6 if ad_shown else 0.8
@@ -889,11 +916,14 @@ class Aplikasi(App):
             msg = TEKS[BAHASA]["bonus_iklan_wajib"].format(bonus_poin)
             self.set_info_sementara(msg, 3.5)
 
-        if hasattr(self, 'ads'):
-            try:
-                self.ads.load_rewarded_ad(ADMOB_REWARDED_ID)
-            except Exception:
-                pass
+        try:
+            muat_iklan_rewarded(
+                ADMOB_REWARDED_ID,
+                callback_sukses=lambda ad: None,
+                callback_gagal=lambda err: None
+            )
+        except Exception:
+            pass
                 
         if getattr(self, 'ads_error', None):
             self.ads_error = None
