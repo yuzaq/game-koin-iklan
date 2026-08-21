@@ -545,8 +545,9 @@ class RewardsHandler(RewardedListenerInterface):
             lambda dt: self.app_ref._iklan_gagal_load(error_code), 0
         )
 
-#___________________________________
-def on_start(self):
+#__________________________________
+class Aplikasi(App):
+    def on_start(self):
         self.ads_error = None
         try:
             inisialisasi_admob(callback_selesai=self._siap_muat_iklan)
@@ -554,6 +555,10 @@ def on_start(self):
             print(f"Gagal Inisialisasi AdMob: {e}")
 
         sinkronkan_data_online(lambda: self.simpan_tampil())
+        
+                # ---> TAMBAHKAN 2 BARIS INI (Sekitar baris 500) <---
+        self.cek_internet()
+        Clock.schedule_interval(self.cek_internet, 5)
 
     def _siap_muat_iklan(self):
         muat_iklan_rewarded(
@@ -561,10 +566,6 @@ def on_start(self):
             callback_sukses=lambda ad: print("DEBUG: Iklan siap ditampilkan"),
             callback_gagal=lambda err: self._iklan_gagal_load(err)
         )
-        
-                # ---> TAMBAHKAN 2 BARIS INI (Sekitar baris 500) <---
-        self.cek_internet()
-        Clock.schedule_interval(self.cek_internet, 5)
         
             # ---> TAMBAHKAN 3 FUNGSI BARU INI (Sejajar dengan def build dan def on_start) <---
     def cek_internet(self, *args):
