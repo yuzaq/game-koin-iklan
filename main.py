@@ -8,9 +8,105 @@ import requests
 from datetime import date
 from random import choice, randint, choices
 from threading import Thread
-from kivmob import KivMob, RewardedListenerInterface
 from kivy.utils import platform
-from jnius import autoclass, cast, PythonJavaClass, java_method, JavaProxy
+from random import randint, choice, choices
+# =========================================================
+# TEMPEL DI BARIS 14 (Menggantikan blok KivMob di fotomu)
+# =========================================================
+
+if platform == 'android':
+    from jnius import autoclass, PythonJavaClass, java_method
+    Activity = autoclass('org.kivy.android.PythonActivity').mActivity
+    MobileAds = autoclass('com.google.android.gms.ads.MobileAds')
+    AdRequest = autoclass('com.google.android.gms.ads.AdRequest$Builder')
+    RewardedAd = autoclass('com.google.android.gms.ads.rewarded.RewardedAd')
+else:
+    Activity = None
+
+class KivyAdMobReward(PythonJavaClass if platform == 'android' else object):
+    if platform == 'android':
+        __javainterfaces__ = [
+            'com/google/android/gms/ads/rewarded/RewardedAdLoadCallback',
+            'com/google/android/gms/ads/OnUserEarnedRewardListener',
+            'com/google/android/gms/ads/FullScreenContentCallback'
+        ]
+        __javacontext__ = 'app'
+
+    def __init__(self, app_instance):
+        if platform == 'android':
+            super(KivyAdMobReward, self).__init__()
+        self.app = app_instance
+        self.rewarded_ad = None
+        if platform == 'android':
+            MobileAds.initialize(Activity)
+
+    def load_rewarded_ad(self, ad_unit_id):
+        if platform != 'android':
+            return
+        
+        class LoadTask(PythonJavaClass):
+            __javainterfaces__ = ['java/lang/Runnable']
+            __javacontext__ = 'app'
+            def __init__(self, wrapper, ad_id):
+                super(LoadTask, self).__init__()
+                self.wrapper = wrapper
+                self.ad_id = ad_id
+            
+            @java_method('()V')
+            def run(self):
+                ad_req = AdRequest().build()
+                RewardedAd.load(Activity, self.ad_id, ad_req, self.wrapper)
+                
+        Activity.runOnUiThread(LoadTask(self, ad_unit_id))
+
+    if platform == 'android':
+        @java_method('(Lcom/google/android/gms/ads/rewarded/RewardedAd;)V')
+        def onAdLoaded(self, ad):
+            self.rewarded_ad = ad
+            self.rewarded_ad.setFullScreenContentCallback(self)
+
+        @java_method('(Lcom/google/android/gms/ads/LoadAdError;)V')
+        def onAdFailedToLoad(self, error):
+            self.rewarded_ad = None
+            Clock.schedule_once(lambda dt: self.app._iklan_gagal_load(error.getCode()), 0)
+
+        @java_method('(Lcom/google/android/gms/ads/rewarded/RewardItem;)V')
+        def onUserEarnedReward(self, reward):
+            Clock.schedule_once(lambda dt: self.app._iklan_selesai(), 0)
+
+        @java_method('()V')
+        def onAdDismissedFullScreenContent(self):
+            self.rewarded_ad = None
+            if hasattr(self.app, 'ADMOB_REWARDED_ID'):
+                self.load_rewarded_ad(self.app.ADMOB_REWARDED_ID)
+
+        @java_method('(Lcom/google/android/gms/ads/AdError;)V')
+        def onAdFailedToShowFullScreenContent(self, adError):
+            self.rewarded_ad = None
+            Clock.schedule_once(lambda dt: self.app._iklan_selesai(), 0)
+
+    def show_rewarded_ad(self):
+        if platform != 'android':
+            Clock.schedule_once(lambda dt: self.app._iklan_selesai(), 0)
+            return
+
+        if self.rewarded_ad:
+            class ShowTask(PythonJavaClass):
+                __javainterfaces__ = ['java/lang/Runnable']
+                __javacontext__ = 'app'
+                def __init__(self, wrapper, ad):
+                    super(ShowTask, self).__init__()
+                    self.wrapper = wrapper
+                    self.ad = ad
+                
+                @java_method('()V')
+                def run(self):
+                    self.ad.show(Activity, self.wrapper)
+                    
+            Activity.runOnUiThread(ShowTask(self, self.rewarded_ad))
+        else:
+            Clock.schedule_once(lambda dt: self.app._iklan_gagal_load("BELUM_READY"), 0)
+
 
 # URL utama Firebase kamu
 FIREBASE_URL = "https://triple8spin-default-rtdb.firebaseio.com"
@@ -78,74 +174,6 @@ ADMOB_BANNER_ID   = "ca-app-pub-3940256099942544/6300978111"  # Test Banner ID
 ADMOB_REWARDED_ID = "ca-app-pub-3940256099942544/5224354917"  # Test Rewarded ID
 
 # ==============================================
-# ADMOB VIA PYJNIUS (NATIVE, GANTI KIVMOB)
-# ==============================================
-from jnius import autoclass, cast, PythonJavaClass, java_method
-
-try:
-    PythonActivity = autoclass('org.kivy.android.PythonActivity')
-    MobileAds = autoclass('com.google.android.gms.ads.MobileAds')
-    AdRequestBuilder = autoclass('com.google.android.gms.ads.AdRequest$Builder')
-    RewardedAd = autoclass('com.google.android.gms.ads.rewarded.RewardedAd')
-    PYJNIUS_ADS_OK = True
-except Exception as e:
-    print(f"GAGAL LOAD KELAS ADMOB: {e}")
-    PYJNIUS_ADS_OK = False
-
-_rewarded_ad_instance = [None]  # simpan iklan yang sudah dimuat, di list biar bisa diubah dari dalam fungsi lain
-_ads_initialized = [False]
-
-
-def inisialisasi_admob(callback_selesai=None):
-    """Wajib dipanggil SEKALI di awal, sebelum minta iklan apapun."""
-    activity = PythonActivity.mActivity
-
-    class InitListener(PythonJavaClass):
-        __javainterfaces__ = ['com/google/android/gms/ads/initialization/OnInitializationCompleteListener']
-
-        @java_method('(Lcom/google/android/gms/ads/initialization/InitializationStatus;)V')
-        def onInitializationComplete(self, status):
-            print("DEBUG: MobileAds berhasil diinisialisasi!")
-            _ads_initialized[0] = True
-            if callback_selesai:
-                Clock.schedule_once(lambda dt: callback_selesai(), 0)
-
-    listener = InitListener()
-    activity.runOnUiThread(lambda: MobileAds.initialize(activity, listener))
-
-
-def muat_iklan_rewarded(ad_unit_id, callback_sukses, callback_gagal):
-    """Minta 1 iklan rewarded baru dari Google."""
-    activity = PythonActivity.mActivity
-    ad_request = AdRequestBuilder().build()
-
-    load_callback = RewardedAdLoadCallback(callback_sukses)
-    load_callback.on_gagal = callback_gagal  # simpan referensi callback gagal juga
-
-    def jalankan():
-        RewardedAd.load(activity, ad_unit_id, ad_request, load_callback)
-
-    activity.runOnUiThread(jalankan)
-
-
-def tampilkan_iklan_rewarded(callback_dapat_reward):
-    """Tampilkan iklan yang SUDAH dimuat (harus load dulu sebelum ini)."""
-    activity = PythonActivity.mActivity
-    ad = _rewarded_ad_instance[0]
-    if ad is None:
-        print("DEBUG: Iklan belum siap, belum bisa ditampilkan")
-        return False
-
-    listener = OnUserEarnedRewardListener(callback_dapat_reward)
-
-    def jalankan():
-        ad.show(activity, listener)
-
-    activity.runOnUiThread(jalankan)
-    _rewarded_ad_instance[0] = None  # iklan cuma bisa dipakai 1x, reset setelah tampil
-    return True
-
-# ==============================================
 # KONFIGURASI PENGAMAN DATA
 # ==============================================
 KUNCI_RAHASIA = "KEY_cicak_didinding"
@@ -169,7 +197,7 @@ from kivy.uix.image import Image
 from kivy.uix.label import Label
 from kivy.network.urlrequest import UrlRequest
 from kivy.uix.textinput import TextInput
-from kivy.uix.popup import Popup # Tambahkan ini di deretan import atas jika belum ada
+from kivy.uix.popup import Popup
 
 # ==============================================
 # DATA BOT TELEGRAM
@@ -414,7 +442,6 @@ def muat_suara():
                 musik_latar.play()
     except Exception:
         pass
-
 def update_musik():
     try:
         if musik_latar:
@@ -522,10 +549,10 @@ class Input(TextInput):
         self.font_size = "18sp"
         self.bold = True
         self.halign = "center"
-        self.foreground_color = (0.83, 0.68, 0.21, 1)  # Warna Gold/Emas untuk teks
-        self.background_color = (0.2, 0.2, 0.2, 1)     # Warna Abu-abu gelap untuk background
-        self.background_normal = ''                     # Agar warna solid tampil akurat
-        self.background_active = ''                     # Agar warna solid tampil akurat
+        self.foreground_color = (0.83, 0.68, 0.21, 1)  # Warna Gold/Emas
+        self.background_color = (0.2, 0.2, 0.2, 1)     # Abu-abu gelap
+        self.background_normal = ''
+        self.background_active = ''
         self.multiline = False
         self.padding = [10, 8, 10, 8]
 
@@ -540,66 +567,49 @@ class RewardsHandler(RewardedListenerInterface):
         pass
 
     def on_rewarded_video_ad_completed(self):
-        Clock.schedule_once(lambda dt: self.app_ref._iklan_selesai(), 0)
-
-    def on_rewarded_video_ad_closed(self):
-        pass
-        
-    def on_rewarded_video_ad_failed_to_load(self, error_code):
         Clock.schedule_once(
-            lambda dt: self.app_ref._iklan_gagal_load(error_code), 0
+            lambda dt: getattr(self.app_ref, "_iklan_selesai", lambda: None)(), 0
         )
 
+    def on_rewarded_video_ad_closed(self):
+        # Otomatis muat ulang rewarded ad saat iklan ditutup
+        if platform == 'android' and getattr(self.app_ref, 'ads', None):
+            try:
+                self.app_ref.ads.load_rewarded_ad(ADMOB_REWARDED_ID)
+            except Exception as e:
+                print(f"Gagal memuat ulang iklan: {e}")
 
-class RewardedAdLoadCallback(JavaProxy):
-    def __init__(self, callback_sukses):
-        super(RewardedAdLoadCallback, self).__init__('com/google/android/gms/ads/rewarded/RewardedAdLoadCallback')
-        self.callback_sukses = callback_sukses
-        self.on_gagal = None
+    def on_rewarded_video_ad_failed_to_load(self, error_code):
+        Clock.schedule_once(
+            lambda dt: getattr(self.app_ref, "_iklan_gagal_load", lambda err=error_code: None)(error_code), 0
+        )
 
-    def onAdLoaded(self, rewardedAd):
-        print("DEBUG: Iklan Rewarded Berhasil Dimuat!")
-        _rewarded_ad_instance[0] = rewardedAd
-        self.callback_sukses(rewardedAd)
-
-    def onAdFailedToLoad(self, loadAdError):
-        pesan = f"Gagal Memuat Iklan: {loadAdError.getMessage()}"
-        print(pesan)
-        if self.on_gagal:
-            self.on_gagal(pesan)
-
-
-class OnUserEarnedRewardListener(JavaProxy):
-    def __init__(self, reward_callback):
-        super(OnUserEarnedRewardListener, self).__init__('com/google/android/gms/ads/OnUserEarnedRewardListener')
-        self.reward_callback = reward_callback
-
-    def onUserEarnedReward(self, rewardItem):
-        print("DEBUG: Pengguna menonton sampai selesai, berikan reward!")
-        self.reward_callback()
-#__________________________________
+# ==============================================
+# KELAS UTAMA APLIKASI
+# ==============================================
 class Aplikasi(App):
     def on_start(self):
         self.ads_error = None
-        try:
-            inisialisasi_admob(callback_selesai=self._siap_muat_iklan)
-        except Exception as e:
-            print(f"Gagal Inisialisasi AdMob: {e}")
+        if platform == 'android':
+            try:
+                self.ads = KivMob(ADMOB_APP_ID)
+                self.ads.new_banner(ADMOB_BANNER_ID, True)
+                self.ads.request_banner()
+                self.ads.show_banner()
 
-        sinkronkan_data_online(lambda: self.simpan_tampil())
+                self.ads.set_rewarded_ad_listener(RewardsHandler(self))
+                self.ads.load_rewarded_ad(ADMOB_REWARDED_ID)
+            except Exception as e:
+                print(f"Gagal Inisialisasi AdMob: {e}")
+                self.ads = None
+        else:
+            self.ads = None
+
+        sinkronkan_data_online(lambda: getattr(self, "simpan_tampil", lambda: None)())
         
-                # ---> TAMBAHKAN 2 BARIS INI (Sekitar baris 500) <---
         self.cek_internet()
         Clock.schedule_interval(self.cek_internet, 5)
 
-    def _siap_muat_iklan(self):
-        muat_iklan_rewarded(
-            ADMOB_REWARDED_ID,
-            callback_sukses=lambda ad: print("DEBUG: Iklan siap ditampilkan"),
-            callback_gagal=lambda err: self._iklan_gagal_load(err)
-        )
-        
-            # ---> TAMBAHKAN 3 FUNGSI BARU INI (Sejajar dengan def build dan def on_start) <---
     def cek_internet(self, *args):
         UrlRequest(
             "https://clients3.google.com/generate_204", 
@@ -610,12 +620,12 @@ class Aplikasi(App):
         )
 
     def koneksi_lancar(self, req, result):
-        if self.popup_internet:
+        if hasattr(self, 'popup_internet') and self.popup_internet:
             self.popup_internet.dismiss()
             self.popup_internet = None
 
     def koneksi_terputus(self, req, error):
-        if not self.popup_internet:
+        if not getattr(self, 'popup_internet', None):
             teks_peringatan = Label(
                 text="[color=ffb822]TIDAK ADA KONEKSI INTERNET![/color]\n\nHarap nyalakan Data/WiFi\nuntuk melanjutkan permainan.",
                 markup=True,
@@ -630,10 +640,12 @@ class Aplikasi(App):
                 auto_dismiss=False 
             )
             self.popup_internet.open()
-        
 
     def build(self):
         Clock.schedule_once(lambda d: muat_suara(), 0.5)
+        self.ADMOB_REWARDED_ID = "ca-app-pub-3940256099942544/5224354917"
+        self.ads = KivyAdMobReward(self)
+        self.ads.load_rewarded_ad(self.ADMOB_REWARDED_ID)
         self.popup_internet = None 
         self.ticker = None
         self.metode_terpilih = "OVO"
@@ -641,6 +653,15 @@ class Aplikasi(App):
         self.sisa_auto = 0
         self.bonus_kotak_terakhir = 0
         self.spin_gratis_tersisa = 5
+         # 1. Inisialisasi variabel status iklan
+        self._iklan_sudah_jalan = False
+        self._iklan_lanjut_fungsi = None
+        self._iklan_beri_bonus = False
+        
+        # 2. Inisialisasi AdMob (Pastikan ADMOB_REWARDED_ID sudah didefinisikan)
+        self.ADMOB_REWARDED_ID = "ca-app-pub-3940256099942544/5224354917" # Ganti dengan ID asli Anda
+        self.ads = KivyAdMobReward(self)
+        self.ads.load_rewarded_ad(self.ADMOB_REWARDED_ID)
 
         l = BoxLayout(orientation="vertical", padding=10, spacing=6)
 
@@ -673,9 +694,9 @@ class Aplikasi(App):
         )
         
         with self.banner_ad_container.canvas.before:
-            Color(0.12, 0.12, 0.12, 1) # Latar abu-abu gelap premium
+            Color(0.12, 0.12, 0.12, 1)
             self.rect_ad = RoundedRectangle(pos=self.banner_ad_container.pos, size=self.banner_ad_container.size, radius=[8])
-            Color(0.83, 0.68, 0.21, 1) # Garis emas (Hex: #D4AF37)
+            Color(0.83, 0.68, 0.21, 1)
             self.line_ad = Line(rounded_rectangle=(self.banner_ad_container.x, self.banner_ad_container.y, self.banner_ad_container.width, self.banner_ad_container.height, 8), width=1)
         
         self.banner_ad_container.bind(
@@ -702,9 +723,8 @@ class Aplikasi(App):
             halign="center",
         )
         
-        # Tambahkan canvas untuk latar belakang berwarna pada area saldo
         with self.saldo_lbl.canvas.before:
-            Color(0.15, 0.15, 0.18, 0.9)  # Warna latar belakang abu-abu gelap elegan
+            Color(0.15, 0.15, 0.18, 0.9)
             self.bg_saldo = RoundedRectangle(
                 pos=self.saldo_lbl.pos, 
                 size=self.saldo_lbl.size, 
@@ -718,22 +738,20 @@ class Aplikasi(App):
         self.saldo_lbl.bind(pos=update_bg_saldo, size=update_bg_saldo)
         l.add_widget(self.saldo_lbl)
 
-
         # 4. KOTAK KONTEN UTAMA
         self.utama = CardBox(
             orientation="vertical", padding=[8, 45, 8, 8], spacing=4, size_hint_y=1.0
         )
-        self.utama.bg_color.rgba = (0.08, 0.08, 0.08, 1) # Override bg menjadi gelap
+        self.utama.bg_color.rgba = (0.08, 0.08, 0.08, 1)
         self.btn_poin_cepat = Tombol(
-        text=TEKS[BAHASA]["iklan"],
-        bg_color=(0.85, 0.55, 0, 1),
-        font_size="12sp",
-        size_hint_y=None,
-        height='36dp',
+            text=TEKS[BAHASA]["iklan"],
+            bg_color=(0.85, 0.55, 0, 1),
+            font_size="12sp",
+            size_hint_y=None,
+            height='36dp',
         )
-        self.btn_poin_cepat.bind(on_press=lambda b: self.dapat_poin())
+        self.btn_poin_cepat.bind(on_press=lambda b: getattr(self, "dapat_poin", lambda: None)())
         self.utama.add_widget(self.btn_poin_cepat)
-
 
         self.info = Label(
             text="",
@@ -750,10 +768,10 @@ class Aplikasi(App):
 
         self.berita = Label(
             text="", markup=True, font_size="11sp", halign="center",
-            color=(0.9, 0.9, 0.9, 1), # Teks lebih terang
+            color=(0.9, 0.9, 0.9, 1),
         )
         with self.berita.canvas.before:
-            self.berita_bg_color = Color(0.15, 0.15, 0.15, 1) # Background berita gelap
+            self.berita_bg_color = Color(0.15, 0.15, 0.15, 1)
             self.berita_bg = RoundedRectangle(
                 pos=self.berita.pos, size=self.berita.size, radius=[14]
             )
@@ -762,16 +780,15 @@ class Aplikasi(App):
             size=lambda inst, val: setattr(self.berita_bg, "size", val),
         )
         
-                # Masukkan berita ke dalam slot_notif, lalu masukkan slot_notif ke utama
         self.slot_notif.add_widget(self.berita)
         self.utama.add_widget(self.slot_notif)
 
-            
         self.pemisah = Widget(size_hint_y=None, height="2dp")
         with self.pemisah.canvas:
-            Color(0.83, 0.68, 0.21, 1) # Garis pemisah warna emas
+            Color(0.83, 0.68, 0.21, 1)
             self.pemisah_line = Line(points=[0, 0, 0, 0], width=1.2)
-        self.pemisah.bind(pos=self._update_pemisah, size=self._update_pemisah)
+        self.pemisah.bind(pos=self._update_pemisah if hasattr(self, '_update_pemisah') else lambda *a: None, 
+                          size=self._update_pemisah if hasattr(self, '_update_pemisah') else lambda *a: None)
 
         # Dashboard Promo
         self.banner_promo = CardBox(
@@ -780,7 +797,7 @@ class Aplikasi(App):
             spacing=4,
             size_hint_y=0.42
         )
-        self.banner_promo.bg_color.rgba = (0.12, 0.12, 0.12, 1) # Gelap
+        self.banner_promo.bg_color.rgba = (0.12, 0.12, 0.12, 1)
 
         self.lbl_jackpot_title = Label(
             text="[b][color=fbbf24]= GRAND JACKPOT =[/color][/b]",
@@ -815,11 +832,10 @@ class Aplikasi(App):
             cols=3, rows=3, spacing=4, size_hint_y=0.42, padding=[8, 8, 8, 8]
         )
         
-        # Tambahan efek bingkai mesin slot yang elegan
         with self.box_slot.canvas.before:
-            Color(0.05, 0.05, 0.05, 1) # Sangat gelap
+            Color(0.05, 0.05, 0.05, 1)
             self.rect_slot = RoundedRectangle(pos=self.box_slot.pos, size=self.box_slot.size, radius=[12])
-            Color(0.83, 0.68, 0.21, 1) # Tepi emas
+            Color(0.83, 0.68, 0.21, 1)
             self.line_slot = Line(rounded_rectangle=(self.box_slot.x, self.box_slot.y, self.box_slot.width, self.box_slot.height, 12), width=1)
             
         self.box_slot.bind(
@@ -857,15 +873,15 @@ class Aplikasi(App):
         self.utama.add_widget(self.layar)
         l.add_widget(self.utama)
 
-        Clock.schedule_once(lambda d: self.mulai_loading(), 0.1)
+        Clock.schedule_once(lambda d: getattr(self, "mulai_loading", lambda: None)(), 0.1)
 
         return l
-
     def ganti_bahasa(self, b):
         global BAHASA
         BAHASA = "EN" if BAHASA == "ID" else "ID"
         self.lbl_jackpot_sub.text = TEKS[BAHASA]["promo_win"]
-        self.mulai_menu()
+        if hasattr(self, "mulai_menu"):
+            self.mulai_menu()
 
     def set_info_sementara(self, pesan, durasi=3.5):
         self.info.text = pesan
@@ -876,27 +892,28 @@ class Aplikasi(App):
         self.info.text = ""
 
     def tunggu_iklan(self, lanjut_fungsi, beri_bonus=False):
-        mainkan_klik()
-        self.layar.clear_widgets()
-        self.info.text = "[color=fbbf24]" + TEKS[BAHASA]["tunggu"] + "[/color]"
-
+        self._iklan_sudah_jalan = False
         self._iklan_lanjut_fungsi = lanjut_fungsi
         self._iklan_beri_bonus = beri_bonus
-        self._iklan_sudah_jalan = False
 
-        ad_shown = False
-        try:
-            ad_shown = tampilkan_iklan_rewarded(
-                callback_dapat_reward=lambda: None
-            )
-        except Exception as e:
-            print(f"AdMob error: {e}")
+        if hasattr(self, 'ads') and self.ads:
+            # Panggil iklan
+            self.ads.show_rewarded_ad()
+        else:
+            # Bypass jika ads gagal diinisialisasi
+            self._iklan_selesai()
 
-        # Batas waktu tunggu supaya tidak macet kalau iklan gagal/belum siap
+    def set_info_sementara(self, pesan, durasi=3.5):
+        if hasattr(self, 'info'):
+            self.info.text = pesan
+            Clock.schedule_once(lambda dt: setattr(self.info, 'text', ''), durasi)
+
+
+        # Batas waktu tunggu supaya tidak macet jika di PC atau jika iklan belum siap
         timeout = 6 if ad_shown else 0.8
-        Clock.schedule_once(lambda d: self._iklan_selesai(), timeout)
-
-    def _iklan_selesai(self):
+        Clock.schedule_once(lambda d: getattr(self, "_iklan_selesai", lambda: None)(), timeout)
+        
+     def _iklan_selesai(self):
         if getattr(self, '_iklan_sudah_jalan', False):
             return
         self._iklan_sudah_jalan = True
@@ -916,14 +933,11 @@ class Aplikasi(App):
             msg = TEKS[BAHASA]["bonus_iklan_wajib"].format(bonus_poin)
             self.set_info_sementara(msg, 3.5)
 
-        try:
-            muat_iklan_rewarded(
-                ADMOB_REWARDED_ID,
-                callback_sukses=lambda ad: None,
-                callback_gagal=lambda err: None
-            )
-        except Exception:
-            pass
+        if hasattr(self, 'ads'):
+            try:
+                self.ads.load_rewarded_ad(ADMOB_REWARDED_ID)
+            except Exception:
+                pass
                 
         if getattr(self, 'ads_error', None):
             self.ads_error = None
@@ -1282,8 +1296,8 @@ class Aplikasi(App):
             on_press=lambda b: self.tunggu_iklan(self.mulai_menu, beri_bonus=True)
         )
         self.layar.add_widget(kmb)
-
-    def cek_dan_spin(self, jumlah_spin):
+        
+            def cek_dan_spin(self, jumlah_spin):
         try:
             self.taruhan = int(self.input_taruh.text.strip())
         except Exception:
@@ -1810,5 +1824,3 @@ class Aplikasi(App):
 
 if __name__ == "__main__":
     Aplikasi().run()
-
-
